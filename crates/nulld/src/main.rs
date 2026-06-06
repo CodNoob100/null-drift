@@ -1,9 +1,9 @@
 use axum::{
+    Json, Router,
     extract::{DefaultBodyLimit, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use bincode::Options;
 use ndarray::{Array1, Array2};
@@ -91,19 +91,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let daemon_state = if fs::metadata(state_file).is_ok() {
         println!("Found checkpoint state.nd. Restoring...");
         let bytes = fs::read(state_file)?;
-        
+
         // SECURITY: Bounded deserialization (50MB limit)
-        let bincode_opts = bincode::DefaultOptions::new()
-            .with_limit(50 * 1024 * 1024);
+        let bincode_opts = bincode::DefaultOptions::new().with_limit(50 * 1024 * 1024);
         let cog_state: CognitiveState = bincode_opts.deserialize(&bytes)?;
-        
+
         let mut hrsa = Hrsa::new(10000);
         hrsa.active_state = cog_state.active_state;
         hrsa.step = cog_state.step;
-        
+
         DaemonState {
-            projector: Projector { w_proj: cog_state.projector_matrix },
-            amn: AttractorIndex { attractors: cog_state.amn_attractors, cleanup_threshold: 3000 },
+            projector: Projector {
+                w_proj: cog_state.projector_matrix,
+            },
+            amn: AttractorIndex {
+                attractors: cog_state.amn_attractors,
+                cleanup_threshold: 3000,
+            },
             hrsa,
             step_history: cog_state.step_history,
         }
@@ -132,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
     let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let bind_addr = format!("{}:{}", host, port);
-    
+
     println!("Daemon listening on http://{}", bind_addr);
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     axum::serve(listener, app).await?;
@@ -148,10 +152,10 @@ async fn handle_inject(
     }
 
     let dense_emb = Array1::from_vec(payload.embedding);
-    
+
     // Acquire Write Lock
     let mut st = state.write().await;
-    
+
     let bipolar_event = st.projector.project_to_hypervector(dense_emb);
 
     if payload.salience >= 0.90 {
@@ -178,10 +182,10 @@ async fn handle_recall(
 ) -> Result<impl IntoResponse, DaemonError> {
     // Acquire Read Lock (Highly concurrent)
     let st = state.read().await;
-    
+
     let mut best_text = None;
     let mut best_score = 0.0;
-    
+
     if let Some(steps) = query.steps_ago {
         if steps < st.step_history.len() {
             let noisy_hv = st.hrsa.recall_event(steps);
@@ -194,7 +198,7 @@ async fn handle_recall(
             let noisy_hv = st.hrsa.recall_event(steps);
             let mut local_best = None;
             let mut local_min_hamming = usize::MAX;
-            
+
             for (clean_hv, concept) in &st.amn.attractors {
                 let mut hamming = 0;
                 for i in 0..noisy_hv.len() {
@@ -207,7 +211,7 @@ async fn handle_recall(
                     local_best = Some(concept.clone());
                 }
             }
-            
+
             let similarity_score = 10000.0 - (local_min_hamming as f32);
             if similarity_score > best_score {
                 best_score = similarity_score;
@@ -224,7 +228,9 @@ async fn handle_recall(
     ))
 }
 
-async fn handle_snapshot(State(state): State<SharedState>) -> Result<impl IntoResponse, DaemonError> {
+async fn handle_snapshot(
+    State(state): State<SharedState>,
+) -> Result<impl IntoResponse, DaemonError> {
     let st = state.read().await;
     let cog_state = CognitiveState {
         projector_matrix: st.projector.w_proj.clone(),
@@ -233,28 +239,45 @@ async fn handle_snapshot(State(state): State<SharedState>) -> Result<impl IntoRe
         amn_attractors: st.amn.attractors.clone(),
         step_history: st.step_history.clone(),
     };
-    
+
     let bytes = bincode::serialize(&cog_state)?;
     fs::write("state.nd", &bytes)?;
-    
-    Ok((StatusCode::OK, Json(SimpleResponse { status: "snapshot_saved".to_string() })))
+
+    Ok((
+        StatusCode::OK,
+        Json(SimpleResponse {
+            status: "snapshot_saved".to_string(),
+        }),
+    ))
 }
 
-async fn handle_restore(State(state): State<SharedState>) -> Result<impl IntoResponse, DaemonError> {
+async fn handle_restore(
+    State(state): State<SharedState>,
+) -> Result<impl IntoResponse, DaemonError> {
     if fs::metadata("state.nd").is_ok() {
         let bytes = fs::read("state.nd")?;
         let bincode_opts = bincode::DefaultOptions::new().with_limit(50 * 1024 * 1024);
         let cog_state: CognitiveState = bincode_opts.deserialize(&bytes)?;
-        
+
         let mut st = state.write().await;
         st.projector.w_proj = cog_state.projector_matrix;
         st.hrsa.active_state = cog_state.active_state;
         st.hrsa.step = cog_state.step;
         st.amn.attractors = cog_state.amn_attractors;
         st.step_history = cog_state.step_history;
-        
-        Ok((StatusCode::OK, Json(SimpleResponse { status: "restored".to_string() })))
+
+        Ok((
+            StatusCode::OK,
+            Json(SimpleResponse {
+                status: "restored".to_string(),
+            }),
+        ))
     } else {
-        Ok((StatusCode::NOT_FOUND, Json(SimpleResponse { status: "state.nd not found".to_string() })))
+        Ok((
+            StatusCode::NOT_FOUND,
+            Json(SimpleResponse {
+                status: "state.nd not found".to_string(),
+            }),
+        ))
     }
 }

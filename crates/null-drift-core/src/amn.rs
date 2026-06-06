@@ -9,7 +9,10 @@ pub struct AttractorIndex {
 
 impl AttractorIndex {
     pub fn new(cleanup_threshold: usize) -> Self {
-        Self { attractors: Vec::new(), cleanup_threshold }
+        Self {
+            attractors: Vec::new(),
+            cleanup_threshold,
+        }
     }
 
     pub fn store(&mut self, hypervector: Array1<f32>, semantic_text: String) {

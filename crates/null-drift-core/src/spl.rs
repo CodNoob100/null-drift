@@ -19,13 +19,13 @@ impl Projector {
                 w_proj[[i, j]] = val * scale;
             }
         }
-        
+
         Self { w_proj }
     }
 
     pub fn project_to_hypervector(&self, dense: Array1<f32>) -> Array1<f32> {
         let projected = dense.dot(&self.w_proj);
-        
+
         // Bipolar activation
         projected.mapv(|x| if x >= 0.0 { 1.0 } else { -1.0 })
     }

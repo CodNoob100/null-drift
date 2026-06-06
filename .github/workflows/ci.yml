@@ -1,0 +1,53 @@
+name: null-drift CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-checks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+        
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+      
+    - name: Check Formatting
+      run: cargo fmt --all -- --check
+      
+    - name: Clippy Lints
+      run: cargo clippy --all-targets --all-features -- -D warnings
+      
+    - name: Run Tests
+      run: cargo test --verbose
+
+  python-checks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install fastapi uvicorn pydantic sentence-transformers requests pytest
+        
+    - name: Run Python Tests (if any)
+      run: |
+        # pytest gateway/tests/
+        echo "Placeholder for pytest"

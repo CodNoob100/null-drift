@@ -1,0 +1,21 @@
+FROM rust:slim AS builder
+
+WORKDIR /usr/src/null-drift
+COPY . .
+
+# Build the workspace
+RUN cargo build --release --bin nulld
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /usr/src/null-drift/target/release/nulld /usr/local/bin/nulld
+
+# Make data directory for state.nd
+RUN mkdir -p /app/data
+WORKDIR /app/data
+
+EXPOSE 3000
+CMD ["nulld"]

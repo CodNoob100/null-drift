@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  nulld:
+    build:
+      context: .
+      dockerfile: Dockerfile.nulld
+    container_name: null-drift-core
+    expose:
+      - "3000"
+    volumes:
+      - nulld_data:/app/data
+    networks:
+      - cognitive_net
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile.gateway
+    container_name: null-drift-gateway
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - NULLD_URL=http://nulld:3000
+    depends_on:
+      - nulld
+    networks:
+      - cognitive_net
+    restart: unless-stopped
+
+volumes:
+  nulld_data:
+
+networks:
+  cognitive_net:
+    driver: bridge

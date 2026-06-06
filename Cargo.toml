@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/null-drift-core",
+    "crates/nulld"
+]
+resolver = "2"

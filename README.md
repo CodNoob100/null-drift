@@ -61,7 +61,7 @@ curl -X POST http://localhost:3000/restore
 
 ## Phase Space Topology (Results)
 
-To prove the mathematical viability of the continuous $10,000$D state vector, we simulated 1,000 random semantic projections. Below is the mapped topology of the HRSA phase space:
+To prove the mathematical viability of the continuous 10,000D state vector, we simulated 1,000 random semantic projections. Below is the mapped topology of the HRSA phase space:
 
 ![3D Phase Space Geometry](results/phase_space_3d.png)
 *A 3D PCA projection demonstrating the extreme sparsity and orthogonality of the generated bipolar {-1.0, 1.0} hypervectors.*

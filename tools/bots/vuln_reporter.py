@@ -111,17 +111,11 @@ def process_cargo_audit(report_path):
         
         title = f"Security Vulnerability: {vuln_id} ({title_str}) in dependency {pkg_name}"
         
-        body = f"### Dependency Vulnerability Alert (Cargo Audit)
-
-"
-        body += f"**Vulnerability ID:** {vuln_id}
-"
-        body += f"**Package:** {pkg_name}
-
-"
-        body += f"**Title:** {title_str}
-
-"
+        body = f"### Dependency Vulnerability Alert (Cargo Audit)\n\n"
+        body += f"**Vulnerability ID:** {vuln_id}\n"
+        body += f"**Package:** {pkg_name}\n"
+        body += f"**Version:** {v.get('package', {}).get('version', 'Unknown')}\n"
+        body += f"**Description:** {v.get('advisory', {}).get('description', 'No description provided')}\n\n"
         
         if actor:
             body += f"cc @{actor} Please update this dependency to a patched version."

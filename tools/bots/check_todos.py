@@ -12,7 +12,7 @@ def check_todos():
     now = datetime.now(timezone.utc)
     
     for root, _, files in os.walk('.'):
-        if '.git' in root or 'target' in root:
+        if 'tools/bots' in root or 'tools\\bots' in root or '.git' in root or 'target' in root:
             continue
             
         for file in files:

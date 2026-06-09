@@ -53,3 +53,4 @@ onnx.zip
 analyze.py
 test_final.py
 download_model.py
+*.log

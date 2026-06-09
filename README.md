@@ -2,6 +2,15 @@
 
 **A Production-Grade Holographic Reversible State Accumulator (HRSA) for AI Agents.**
 
+<p align="center">
+  <img src="benchmark_memory.png" alt="null-drift vs VectorDB Memory Benchmark" width="800">
+</p>
+
+<p align="center">
+  <img src="demo.gif" alt="null-drift High-Concurrency Terminal Demo" width="800">
+  <br>
+  <em>*Benchmarking the pure Rust daemon's lock-free Axum concurrency (bypassing the Python ML inference gateway).</em>
+</p>
 `null-drift` is a bare-metal cognitive memory metabolism. It bridges the gap between massive LLM semantic outputs and mathematical hyperdimensional phase spaces, granting AI agents persistent, continuous, and computationally cheap episodic memory.
 
 By projecting standard semantic embeddings into a 10,000-dimensional bipolar mathematical phase space, `null-drift` binds sequences of events into a continuous temporal energy landscape. It utilizes fractional salience superposition and temporal permutation to build causal chains, naturally filtering out "noise" (low-salience events) while preserving high-salience cognitive anchors.

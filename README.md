@@ -4,6 +4,8 @@
 
 <p align="center">
   <img src="benchmark_memory.png" alt="null-drift vs VectorDB Memory Benchmark" width="800">
+  <br>
+  <em>*Mathematical projection demonstrating the <b>O(1)</b> constant memory bounds of the HRSA architecture vs the <b>O(N)</b> linear scaling of standard VectorDB indices.</em>
 </p>
 
 <p align="center">

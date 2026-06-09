@@ -1,0 +1,43 @@
+name: External Security Scanners
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 0 * * 0' # Run weekly on Sundays
+
+jobs:
+  security-scanning:
+    name: Non-Blocking Security Scans
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks
+        run: |
+          wget https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+          tar -xzf gitleaks_8.18.2_linux_x64.tar.gz
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Run Gitleaks (No fail)
+        run: gitleaks detect --source . -v --report-path gitleaks_report.json --report-format json --exit-code 0
+
+      - name: Install OSV-Scanner
+        run: go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+
+      - name: Run OSV-Scanner (No fail)
+        run: ~/go/bin/osv-scanner --json -r . > osv_report.json || true
+
+      - name: Install and Run Cargo Audit (No fail)
+        run: |
+          cargo install cargo-audit
+          cargo audit --json > audit_report.json || true
+
+      - name: Create Issues and Ping Contributor
+        env:
+          GITHUB_TOKEN: $\{{ secrets.GITHUB_TOKEN \}}
+        run: python3 tools/bots/vuln_reporter.py

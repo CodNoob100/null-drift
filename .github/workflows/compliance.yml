@@ -1,0 +1,72 @@
+name: Compliance Bots
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  check-direct-push:
+    name: PR Enforcement Bot
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Prevent direct push to main
+        run: |
+          commit_message=$(git log -1 --pretty=format:"%s")
+          if [[ "$commit_message" != Merge* ]] && [[ "$commit_message" != *"Merge pull request"* ]]; then
+            echo "ERROR: Direct pushes to main are strictly forbidden. You must use a Pull Request."
+            exit 1
+          fi
+
+  check-contributing-rules:
+    name: Contributing Rules Bot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install nightly
+          rustup default nightly
+          rustup component add clippy rustfmt
+      - name: Code Formatting Check (cargo fmt)
+        run: cargo fmt --check
+
+      - name: Zero-Warnings Policy (cargo clippy)
+        run: cargo clippy --workspace --lib --bins -- -D warnings
+
+      - name: Python Formatting Check (black)
+        run: |
+          pip install black
+          black --check gateway/ test_final.py docker_load_test.py generate_true_gif.py generate_gif.py || true
+
+      - name: Python Linter Check (flake8)
+        run: |
+          pip install flake8
+          flake8 gateway/ --max-line-length=120 || true
+
+      - name: Check for duplicate dependencies
+        run: |
+          cargo tree --duplicates > dupes.txt || true
+          if [ -s dupes.txt ]; then
+            echo "ERROR: Duplicate dependencies found!"
+            cat dupes.txt
+            exit 1
+          fi
+
+      - name: Check TODO formats
+        run: python3 tools/bots/check_todos.py
+
+
+
+      - name: Check Code Quality & Dead Code Policies
+        run: python3 tools/bots/check_quality.py
+
+

@@ -1,0 +1,40 @@
+name: Bug Report
+description: Create a report to help us improve the OS
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! If you've found a security vulnerability, do NOT file a public issue. See SECURITY.md for instructions on private disclosure.
+  - type: input
+    id: qemu_version
+    attributes:
+      label: QEMU Version
+      description: What version of QEMU are you using? (e.g., 8.0.0)
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: What steps will reproduce the bug?
+      placeholder: |
+        1. Run `cargo test` with...
+        2. Execute `python3 tools/...`
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include logs or exit codes.
+    validations:
+      required: true

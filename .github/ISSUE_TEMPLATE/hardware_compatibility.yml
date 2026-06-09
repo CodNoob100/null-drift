@@ -1,0 +1,33 @@
+name: Hardware Compatibility Report
+description: Report test results on physical RISC-V hardware
+title: "[Hardware]: "
+labels: ["hardware"]
+body:
+  - type: input
+    id: board
+    attributes:
+      label: Development Board Name
+      description: What is the specific board model? (e.g., SiFive Unleashed, VisionFive 2)
+    validations:
+      required: true
+  - type: checkboxes
+    id: extensions
+    attributes:
+      label: Required RISC-V Extensions Verified
+      description: Confirm which required extensions are present on this SoC.
+      options:
+        - label: RV64GC (Base + M + A + F + D + C)
+          required: true
+        - label: Zicsr (Control and Status Register Instructions)
+          required: true
+        - label: Zifencei (Instruction-Fetch Fence)
+          required: true
+        - label: Smepmp (Enhanced Physical Memory Protection)
+          required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Execution Results
+      description: Please share UART logs, fault dumps, or TelemetryDescriptor dumps from your hardware execution.
+    validations:
+      required: true

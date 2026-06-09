@@ -1,5 +1,5 @@
 use ndarray::{Array1, Array2};
-use rand::Rng;
+use rand::RngExt;
 use rand_distr::StandardNormal;
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ impl Projector {
     pub fn new(dense_dim: usize, hyper_dim: usize) -> Self {
         let scale = 1.0 / (dense_dim as f32).sqrt();
         let mut w_proj = Array2::zeros((dense_dim, hyper_dim));
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for i in 0..dense_dim {
             for j in 0..hyper_dim {
                 let val: f32 = rng.sample(StandardNormal);

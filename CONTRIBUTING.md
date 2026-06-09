@@ -61,4 +61,4 @@ We utilize several automated bots to maintain repository health:
 - **Compliance Bots:** Enforces `cargo fmt`, zero-warnings `cargo clippy`, and blocks direct pushes to `main`.
 - **Security Scanners:** Runs `cargo-audit` and `gitleaks` to ensure no vulnerable dependencies or leaked secrets enter the codebase.
 
-By submitting a Pull Request, you agree that your contributions will be licensed under the project's MIT License.
+By submitting a Pull Request, you agree that your contributions will be licensed under the project's AGPL-3.0 License.

@@ -21,7 +21,7 @@ jobs:
           path-to-document: 'https://github.com/CodNoob100/null-drift/blob/main/CONTRIBUTING.md' # Links to the CLA text
           # branch should not be protected
           branch: 'cla-signatures'
-          allowlist: 'bot*,dependabot[bot],github-actions[bot]'
+          allowlist: 'bot*,dependabot[bot],github-actions[bot],CodNoob100'
           
           # Custom Messages
           custom-notsigned-prcomment: 'Thank you for your submission to null-drift! To ensure the long-term legal sustainability of the project, we require all contributors to sign our Contributor License Agreement (CLA).<br/>Please leave a comment below saying exactly: **I have read the CLA Document and I hereby sign the CLA**'

@@ -35,7 +35,7 @@ jobs:
 
       - name: Upload audit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: audit-report-${{ github.sha }}
           path: Cargo.lock # Just uploading lockfile for now as cargo audit doesn't output json file directly without extra config

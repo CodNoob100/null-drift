@@ -23,6 +23,7 @@ jobs:
             exit 1
           fi
 
+
   check-contributing-rules:
     name: Contributing Rules Bot
     runs-on: ubuntu-latest

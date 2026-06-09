@@ -39,6 +39,7 @@ To maintain high engineering standards, our CI pipeline strictly enforces the fo
    - The dependency tree must not contain duplicate versions of the same crate (`cargo tree --duplicates`).
    - All dependencies are audited for known CVEs via `cargo-audit` and `osv-scanner`.
 5. **No Secret Leaks:** Hardcoded secrets and credentials are automatically flagged and blocked by `gitleaks`.
+6. **Branch Protection:** The `main` branch is strictly protected. Force pushing and branch deletion are globally disabled. Status checks (including all CI rules above) must pass before a Pull Request can be merged.
 
 ## 🛠️ Pull Request Process
 

@@ -14,7 +14,7 @@ Currently, only the latest `main` branch of `null-drift` is officially supported
 
 We take the security of `null-drift` very seriously. If you discover a vulnerability, **do not open a public issue.**
 
-Please report any security issues privately by emailing `security@null-drift.dev` (or the maintainer's direct email). We will acknowledge receipt of your vulnerability report within 48 hours and strive to send you regular updates about our progress.
+Please report any security issues privately by emailing `anshuman.dwibedi.dev@gmail.com`. We will acknowledge receipt of your vulnerability report within 48 hours and strive to send you regular updates about our progress.
 
 ---
 

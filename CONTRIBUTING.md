@@ -54,6 +54,11 @@ To maintain high engineering standards, our CI pipeline strictly enforces the fo
 4. **Commit your changes.** Please use descriptive commit messages.
 5. **Push to your fork and submit a Pull Request** against the `main` branch.
 
+## 📝 Maintaining a Changelog
+
+To keep track of all the changes, features, and bug fixes in each release, we maintain a `CHANGELOG.md` file based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
+When submitting a Pull Request, please ensure you update the `CHANGELOG.md` file in the `[Unreleased]` section with a brief description of your changes. Categorize your changes under `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, or `Security`.
+
 ## 🤖 Automated Bots and CI
 
 We utilize several automated bots to maintain repository health:

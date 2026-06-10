@@ -1,5 +1,10 @@
 # Project null-drift
 
+[![License](https://img.shields.io/github/license/CodNoob100/null-drift)](LICENSE)
+[![Issues](https://img.shields.io/github/issues/CodNoob100/null-drift)](https://github.com/CodNoob100/null-drift/issues)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Security: Active](https://img.shields.io/badge/Security-Active_Monitoring-success.svg)](SECURITY.md)
+
 **A Production-Grade Holographic Reversible State Accumulator (HRSA) for AI Agents.**
 
 <p align="center">

@@ -1,5 +1,8 @@
 # Contributing to null-drift
 
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/CodNoob100/null-drift/pulls)
+[![Good First Issues](https://img.shields.io/github/issues/CodNoob100/null-drift/good%20first%20issue)](https://github.com/CodNoob100/null-drift/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+
 First off, thank you for considering contributing to `null-drift`! It's people like you that make open source such a great community.
 
 ## 🚀 Getting Started
@@ -23,6 +26,21 @@ If you are new to the project, the best place to start is by looking at the **Go
    pip install -r requirements.txt
    python main.py
    ```
+
+## 💡 Submitting Feature Requests & Bug Reports
+
+To help us triage issues efficiently, please observe our **Issue Naming Conventions**. When opening a new issue, your title must start with one of the following prefixes:
+- `[BUG]` - Reporting a bug or error.
+- `[FEATURE]` - Suggesting a new feature or enhancement.
+- `[DOCS]` - Proposing improvements to documentation.
+- `[DX]` - Suggesting improvements to Developer Experience (tooling, workflows, etc.).
+
+*Note: If you use the provided GitHub Issue Templates, these prefixes will be added to your title automatically!*
+
+**Feature Requests** should be well thought out. Please include:
+1. The specific problem you are trying to solve.
+2. A detailed explanation of your proposed solution.
+3. Any alternatives you have considered.
 
 ## ⚖️ Code Quality & CI Rules
 

@@ -58,6 +58,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Restrict Workflow and Bot Edits
+        if: github.event_name == 'pull_request' && !contains(fromJSON('["OWNER", "COLLABORATOR", "MEMBER"]'), github.event.pull_request.author_association)
+        run: |
+          git fetch origin main
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          if echo "$CHANGED_FILES" | grep -qE '^(\.github/workflows/|tools/bots/)'; then
+            echo "ERROR: You do not have permission to modify CI workflows or bots."
+            exit 1
+          fi
+
+
       - name: Install Rust
         run: |
           rustup toolchain install nightly

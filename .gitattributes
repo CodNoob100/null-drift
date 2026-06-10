@@ -1,0 +1,24 @@
+# .gitattributes
+
+# Exclude all dev tools and documentation from GitHub Release zip files
+results export-ignore
+tools export-ignore
+.github export-ignore
+Cargo.lock export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
+
+# Exclude Markdown files (except LICENSE which doesn't have an .md extension)
+*.md export-ignore
+
+# Exclude massive binaries and scripts not required for the production release
+*.png export-ignore
+*.gif export-ignore
+*.dll export-ignore
+models export-ignore
+onnx export-ignore
+onnx.zip export-ignore
+protection.json export-ignore
+analyze.py export-ignore
+download_model.py export-ignore
+test_final.py export-ignore

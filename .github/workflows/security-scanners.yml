@@ -12,6 +12,9 @@ jobs:
   security-scanning:
     name: Non-Blocking Security Scans
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v6
         with:

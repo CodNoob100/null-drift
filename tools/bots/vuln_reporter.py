@@ -3,7 +3,27 @@ import sys
 import json
 import subprocess
 
+ACTIVE_VULNERABILITIES = set()
+OPEN_ISSUES = {}
+
+def get_open_security_issues():
+    global OPEN_ISSUES
+    cmd = ['gh', 'issue', 'list', '--state', 'open', '--search', 'in:title "Security Vulnerability:"', '--json', 'number,title', '--limit', '200']
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        issues = json.loads(result.stdout)
+        for issue in issues:
+            OPEN_ISSUES[issue['title']] = issue['number']
+    except Exception as e:
+        print(f"Failed to fetch open security issues: {e}")
+
 def create_issue(title, body, assignees=[]):
+    ACTIVE_VULNERABILITIES.add(title)
+    
+    if title in OPEN_ISSUES:
+        print(f"Issue already exists for: {title}")
+        return
+        
     cmd = ['gh', 'issue', 'create', '--title', title, '--body', body]
     if assignees:
         assignees_str = ",".join(assignees)
@@ -14,6 +34,16 @@ def create_issue(title, body, assignees=[]):
         subprocess.run(cmd, check=True)
     except Exception as e:
         print(f"Failed to create issue: {e}")
+
+def close_stale_issues():
+    for title, number in OPEN_ISSUES.items():
+        if title not in ACTIVE_VULNERABILITIES:
+            print(f"Closing stale issue #{number}: {title}")
+            cmd = ['gh', 'issue', 'close', str(number), '-c', 'Vulnerability has been automatically resolved by recent patches.']
+            try:
+                subprocess.run(cmd, check=True)
+            except Exception as e:
+                print(f"Failed to close issue #{number}: {e}")
 
 def get_pr_author():
     actor = os.environ.get('GITHUB_ACTOR')
@@ -88,7 +118,6 @@ def process_osv(report_path):
                 assignees = [actor] if actor else []
                 create_issue(title, body, assignees)
 
-
 def process_cargo_audit(report_path):
     if not os.path.exists(report_path):
         return
@@ -124,7 +153,10 @@ def process_cargo_audit(report_path):
         create_issue(title, body, assignees)
 
 if __name__ == '__main__':
+    get_open_security_issues()
+    
     process_gitleaks('gitleaks_report.json')
     process_osv('osv_report.json')
     process_cargo_audit('audit_report.json')
-
+    
+    close_stale_issues()

@@ -42,5 +42,5 @@ jobs:
 
       - name: Create Issues and Ping Contributor
         env:
-          GITHUB_TOKEN: $\{{ secrets.GITHUB_TOKEN \}}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 tools/bots/vuln_reporter.py

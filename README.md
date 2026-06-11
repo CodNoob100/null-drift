@@ -81,9 +81,9 @@ The following benchmarks were generated dynamically on a consumer-grade laptop, 
 - **Background Disk Paging (Snapshot):** ~10.40 ms
 
 ### Architectural Scaling Bounds
-- **Total State Memory per Thread:** Strictly **< 50 KB** (Constant $O(1)$).
-- **Shared Global Context:** 15 MB ($W_{proj}$ deterministic projector matrix shared safely across all threads).
-- **Time Complexity:** $O(1)$ mathematically bounded. Searching the memory bank never degrades over time.
+- **Total State Memory per Thread:** Strictly **< 50 KB** (Constant `O(1)`).
+- **Shared Global Context:** 15 MB (`W_{proj}` deterministic projector matrix shared safely across all threads).
+- **Time Complexity:** `O(1)` mathematically bounded. Searching the memory bank never degrades over time.
 
 ## The Physics (How it Works)
 
@@ -99,6 +99,16 @@ The following benchmarks were generated dynamically on a consumer-grade laptop, 
 * **OOM & Serialization Protection:** Checkpointing utilizes strict struct-based bounds via the Embedded WG's `postcard` specification to prevent Out-Of-Memory (OOM) attacks from corrupted `.nd` state files, completely eliminating the deprecated `bincode` system.
 * **Lock-Free Concurrency:** The Rust daemon utilizes `moka::future::Cache` and `tokio::sync::RwLock` over standard Mutexes, entirely eliminating Mutex poisoning vectors and allowing highly concurrent multi-tenant isolation.
 * **Unbound Allocation Defense:** The axum router enforces a strict 64KB `DefaultBodyLimit` to prevent memory exhaustion via payload flooding.
+
+## Integrations
+
+`null-drift` seamlessly integrates with modern AI agent orchestration frameworks to provide infinite context memory out-of-the-box.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/crewAIInc/crewAI/main/docs/images/crewai_logo.png" width="300" alt="CrewAI">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="https://raw.githubusercontent.com/langchain-ai/langgraph/main/.github/images/logo-dark.svg" width="300" alt="LangGraph">
+</p>
 
 ## License
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.

@@ -1,7 +1,7 @@
 use ndarray::{Array1, Array2};
 use rand::SeedableRng;
-use rand_pcg::Pcg64;
 use rand_distr::{Distribution, StandardNormal};
+use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]

@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install heavy frameworks for integration testing
+RUN pip install --default-timeout=1000 --no-cache-dir pytest pytest-asyncio httpx langgraph crewai sentence-transformers
+
+# Copy the SDK and Tests
+COPY nulldrift_agents.py /app/
+COPY tests/integration /app/tests/
+
+ENV PYTHONPATH=/app
+
+CMD ["pytest", "/app/tests/", "-v", "-s"]

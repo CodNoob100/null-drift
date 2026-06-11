@@ -59,6 +59,13 @@ To maintain high engineering standards, our CI pipeline strictly enforces the fo
 5. **No Secret Leaks:** Hardcoded secrets and credentials are automatically flagged and blocked by `gitleaks`.
 6. **Branch Protection:** The `main` branch is strictly protected. Force pushing and branch deletion are globally disabled. Status checks (including all CI rules above) must pass before a Pull Request can be merged.
 
+## 🤝 Adding SDK Integrations
+
+`null-drift` aims to natively support all major AI agent frameworks (e.g., `CrewAI`, `LangGraph`, `AutoGen`). If you are contributing a new framework adapter to `nulldrift_agents.py`, you must:
+1. Ensure the adapter natively forwards the `thread_id` to support the daemon's Multi-Tenant Architecture.
+2. Implement isolated tests for the adapter within the `tests/integration/` suite.
+3. Verify that the adapter seamlessly triggers asynchronous `/snapshot` and `/restore` sequences for Time-To-Idle (TTI) compliance.
+
 ## 🛠️ Pull Request Process
 
 1. **Create a new branch** for your feature or bugfix (`git checkout -b feature/my-awesome-feature`).

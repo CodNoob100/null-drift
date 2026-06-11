@@ -6,13 +6,15 @@ use axum::{
     routing::{get, post},
 };
 use bincode::Options;
-use ndarray::{Array1, Array2};
+use moka::future::Cache;
+use ndarray::Array1;
 use null_drift_core::amn::AttractorIndex;
 use null_drift_core::hrsa::Hrsa;
 use null_drift_core::spl::Projector;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::fs;
 use tokio::sync::RwLock;
 
 #[derive(thiserror::Error, Debug)]
@@ -38,22 +40,27 @@ impl IntoResponse for DaemonError {
 }
 
 #[derive(Serialize, Deserialize)]
-struct CognitiveState {
-    projector_matrix: Array2<f32>,
-    active_state: Array1<f32>,
-    step: usize,
-    amn_attractors: Vec<(Array1<f32>, String)>,
-    step_history: Vec<String>,
-}
-
-struct DaemonState {
-    projector: Projector,
+struct ThreadState {
     amn: AttractorIndex,
     hrsa: Hrsa,
-    step_history: Vec<String>,
 }
 
-type SharedState = Arc<RwLock<DaemonState>>;
+struct GlobalState {
+    projector: Projector,
+    threads: Cache<String, Arc<RwLock<ThreadState>>>,
+}
+
+type SharedState = Arc<GlobalState>;
+
+#[derive(Deserialize)]
+struct ThreadQuery {
+    #[serde(default = "default_thread_id")]
+    thread_id: String,
+}
+
+fn default_thread_id() -> String {
+    "default".to_string()
+}
 
 #[derive(Deserialize)]
 struct InjectPayload {
@@ -70,6 +77,8 @@ struct InjectResponse {
 
 #[derive(Deserialize)]
 struct RecallQuery {
+    #[serde(default = "default_thread_id")]
+    thread_id: String,
     steps_ago: Option<usize>,
 }
 
@@ -85,51 +94,42 @@ struct SimpleResponse {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting null-drift HRSA daemon configuration...");
+    println!("Starting null-drift HRSA multi-tenant daemon...");
 
-    let state_file = "state.nd";
-    let daemon_state = if fs::metadata(state_file).is_ok() {
-        println!("Found checkpoint state.nd. Restoring...");
-        let bytes = fs::read(state_file)?;
-
-        // SECURITY: Bounded deserialization (50MB limit)
-        let bincode_opts = bincode::DefaultOptions::new().with_limit(50 * 1024 * 1024);
-        let cog_state: CognitiveState = bincode_opts.deserialize(&bytes)?;
-
-        let mut hrsa = Hrsa::new(10000);
-        hrsa.active_state = cog_state.active_state;
-        hrsa.step = cog_state.step;
-
-        DaemonState {
-            projector: Projector {
-                w_proj: cog_state.projector_matrix,
-            },
-            amn: AttractorIndex {
-                attractors: cog_state.amn_attractors,
-                cleanup_threshold: 3000,
-            },
-            hrsa,
-            step_history: cog_state.step_history,
-        }
-    } else {
-        println!("No checkpoint found. Generating fresh Gaussian W_proj...");
-        DaemonState {
-            projector: Projector::new(384, 10000),
-            amn: AttractorIndex::new(3000),
-            hrsa: Hrsa::new(10000),
-            step_history: Vec::new(),
-        }
+    let eviction_listener = |key: Arc<String>,
+                             value: Arc<RwLock<ThreadState>>,
+                             _cause: moka::notification::RemovalCause| {
+        let thread_id = key.to_string();
+        tokio::spawn(async move {
+            let ts = value.read().await;
+            if let Ok(bytes) = bincode::serialize(&*ts) {
+                let _ = tokio::fs::write(format!("state_{}.nd", thread_id), bytes).await;
+                println!(
+                    "Disk Paging: Saved {} to disk due to inactivity.",
+                    thread_id
+                );
+            }
+        });
     };
 
-    // SECURITY: Use RwLock to prevent panics from poisoning the state
-    let state = Arc::new(RwLock::new(daemon_state));
+    let cache = Cache::builder()
+        .time_to_idle(Duration::from_secs(86400)) // 24 hours TTL
+        .max_capacity(10000)
+        .eviction_listener(eviction_listener)
+        .build();
+
+    let global_state = GlobalState {
+        projector: Projector::new(384, 10000), // Deterministic seed internally
+        threads: cache,
+    };
+
+    let state = Arc::new(global_state);
 
     let app = Router::new()
         .route("/inject", post(handle_inject))
         .route("/recall", get(handle_recall))
         .route("/snapshot", post(handle_snapshot))
         .route("/restore", post(handle_restore))
-        // SECURITY: 64KB body limit to prevent memory exhaustion
         .layer(DefaultBodyLimit::max(64 * 1024))
         .with_state(state);
 
@@ -143,29 +143,62 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+async fn get_or_load_thread(
+    state: &SharedState,
+    thread_id: &str,
+) -> Result<Arc<RwLock<ThreadState>>, DaemonError> {
+    if let Some(ts) = state.threads.get(thread_id).await {
+        return Ok(ts);
+    }
+
+    let file_path = format!("state_{}.nd", thread_id);
+    if fs::metadata(&file_path).await.is_ok() {
+        let bytes = fs::read(&file_path).await?;
+        let bincode_opts = bincode::DefaultOptions::new().with_limit(5 * 1024 * 1024);
+        if let Ok(ts_data) = bincode_opts.deserialize::<ThreadState>(&bytes) {
+            let ts = Arc::new(RwLock::new(ts_data));
+            state
+                .threads
+                .insert(thread_id.to_string(), ts.clone())
+                .await;
+            return Ok(ts);
+        }
+    }
+
+    let new_ts = ThreadState {
+        amn: AttractorIndex::new(3000),
+        hrsa: Hrsa::new(10000),
+    };
+    let ts = Arc::new(RwLock::new(new_ts));
+    state
+        .threads
+        .insert(thread_id.to_string(), ts.clone())
+        .await;
+    Ok(ts)
+}
+
 async fn handle_inject(
     State(state): State<SharedState>,
+    Query(query): Query<ThreadQuery>,
     Json(payload): Json<InjectPayload>,
 ) -> Result<impl IntoResponse, DaemonError> {
     if payload.embedding.len() != 384 {
         return Err(DaemonError::InvalidDimension);
     }
 
+    let thread_lock = get_or_load_thread(&state, &query.thread_id).await?;
+    let mut ts = thread_lock.write().await;
+
     let dense_emb = Array1::from_vec(payload.embedding);
-
-    // Acquire Write Lock
-    let mut st = state.write().await;
-
-    let bipolar_event = st.projector.project_to_hypervector(dense_emb);
+    let bipolar_event = state.projector.project_to_hypervector(dense_emb);
 
     if payload.salience >= 0.90 {
-        st.amn.store(bipolar_event.clone(), payload.text.clone());
+        ts.amn.store(bipolar_event.clone(), payload.text.clone());
     }
 
-    st.hrsa.inject_event(&bipolar_event, payload.salience);
-    st.step_history.push(payload.text.clone());
+    ts.hrsa.inject_event(&bipolar_event, payload.salience);
 
-    let current_step = st.hrsa.step;
+    let current_step = ts.hrsa.step;
 
     Ok((
         StatusCode::OK,
@@ -180,26 +213,26 @@ async fn handle_recall(
     State(state): State<SharedState>,
     Query(query): Query<RecallQuery>,
 ) -> Result<impl IntoResponse, DaemonError> {
-    // Acquire Read Lock (Highly concurrent)
-    let st = state.read().await;
+    let thread_lock = get_or_load_thread(&state, &query.thread_id).await?;
+    let ts = thread_lock.read().await;
 
     let mut best_text = None;
     let mut best_score = 0.0;
 
     if let Some(steps) = query.steps_ago {
-        if steps < st.step_history.len() {
-            let noisy_hv = st.hrsa.recall_event(steps);
-            if let Some(text) = st.amn.cleanup(&noisy_hv) {
+        if steps < ts.hrsa.step {
+            let noisy_hv = ts.hrsa.recall_event(steps);
+            if let Some(text) = ts.amn.cleanup(&noisy_hv) {
                 best_text = Some(text);
             }
         }
     } else {
-        for steps in 0..st.step_history.len() {
-            let noisy_hv = st.hrsa.recall_event(steps);
+        for steps in 0..ts.hrsa.step {
+            let noisy_hv = ts.hrsa.recall_event(steps);
             let mut local_best = None;
             let mut local_min_hamming = usize::MAX;
 
-            for (clean_hv, concept) in &st.amn.attractors {
+            for (clean_hv, concept) in &ts.amn.attractors {
                 let mut hamming = 0;
                 for i in 0..noisy_hv.len() {
                     if noisy_hv[i] != clean_hv[i] {
@@ -230,18 +263,13 @@ async fn handle_recall(
 
 async fn handle_snapshot(
     State(state): State<SharedState>,
+    Query(query): Query<ThreadQuery>,
 ) -> Result<impl IntoResponse, DaemonError> {
-    let st = state.read().await;
-    let cog_state = CognitiveState {
-        projector_matrix: st.projector.w_proj.clone(),
-        active_state: st.hrsa.active_state.clone(),
-        step: st.hrsa.step,
-        amn_attractors: st.amn.attractors.clone(),
-        step_history: st.step_history.clone(),
-    };
+    let thread_lock = get_or_load_thread(&state, &query.thread_id).await?;
+    let ts = thread_lock.read().await;
 
-    let bytes = bincode::serialize(&cog_state)?;
-    fs::write("state.nd", &bytes)?;
+    let bytes = bincode::serialize(&*ts)?;
+    fs::write(format!("state_{}.nd", query.thread_id), &bytes).await?;
 
     Ok((
         StatusCode::OK,
@@ -253,18 +281,16 @@ async fn handle_snapshot(
 
 async fn handle_restore(
     State(state): State<SharedState>,
+    Query(query): Query<ThreadQuery>,
 ) -> Result<impl IntoResponse, DaemonError> {
-    if fs::metadata("state.nd").is_ok() {
-        let bytes = fs::read("state.nd")?;
-        let bincode_opts = bincode::DefaultOptions::new().with_limit(50 * 1024 * 1024);
-        let cog_state: CognitiveState = bincode_opts.deserialize(&bytes)?;
+    let file_path = format!("state_{}.nd", query.thread_id);
+    if fs::metadata(&file_path).await.is_ok() {
+        let bytes = fs::read(&file_path).await?;
+        let ts_data: ThreadState = bincode::deserialize(&bytes)?;
 
-        let mut st = state.write().await;
-        st.projector.w_proj = cog_state.projector_matrix;
-        st.hrsa.active_state = cog_state.active_state;
-        st.hrsa.step = cog_state.step;
-        st.amn.attractors = cog_state.amn_attractors;
-        st.step_history = cog_state.step_history;
+        // Force overwrite in moka cache
+        let ts = Arc::new(RwLock::new(ts_data));
+        state.threads.insert(query.thread_id.clone(), ts).await;
 
         Ok((
             StatusCode::OK,
@@ -276,7 +302,7 @@ async fn handle_restore(
         Ok((
             StatusCode::NOT_FOUND,
             Json(SimpleResponse {
-                status: "state.nd not found".to_string(),
+                status: "state file not found".to_string(),
             }),
         ))
     }

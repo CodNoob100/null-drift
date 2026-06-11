@@ -1,6 +1,7 @@
 use ndarray::{Array1, Array2};
-use rand::RngExt;
-use rand_distr::StandardNormal;
+use rand::SeedableRng;
+use rand_distr::{Distribution, StandardNormal};
+use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -12,10 +13,10 @@ impl Projector {
     pub fn new(dense_dim: usize, hyper_dim: usize) -> Self {
         let scale = 1.0 / (dense_dim as f32).sqrt();
         let mut w_proj = Array2::zeros((dense_dim, hyper_dim));
-        let mut rng = rand::rng();
+        let mut rng = Pcg64::seed_from_u64(42);
         for i in 0..dense_dim {
             for j in 0..hyper_dim {
-                let val: f32 = rng.sample(StandardNormal);
+                let val: f32 = StandardNormal.sample(&mut rng);
                 w_proj[[i, j]] = val * scale;
             }
         }

@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  nulld:
+    build:
+      context: .
+      dockerfile: Dockerfile.nulld
+    container_name: null-drift-test-core
+    networks:
+      - cognitive_test_net
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile.gateway
+    container_name: null-drift-test-gateway
+    environment:
+      - NULLD_URL=http://nulld:3000
+    depends_on:
+      - nulld
+    networks:
+      - cognitive_test_net
+
+  test-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: null-drift-test-client
+    environment:
+      - GATEWAY_URL=http://gateway:8000
+    depends_on:
+      - gateway
+    networks:
+      - cognitive_test_net
+
+networks:
+  cognitive_test_net:
+    driver: bridge

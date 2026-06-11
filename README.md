@@ -105,9 +105,15 @@ The following benchmarks were generated dynamically on a consumer-grade laptop, 
 `null-drift` seamlessly integrates with modern AI agent orchestration frameworks to provide infinite context memory out-of-the-box.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/crewAIInc/crewAI/main/docs/images/crewai_logo.png" width="300" alt="CrewAI">
+  <img src="https://raw.githubusercontent.com/crewAIInc/crewAI/main/docs/images/crewai_logo.png" height="60" alt="CrewAI">
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/langchain-ai/langgraph/main/.github/images/logo-dark.svg" width="300" alt="LangGraph">
+  <a href="https://www.langchain.com/langgraph">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/langchain-ai/langgraph/main/.github/images/logo-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/langchain-ai/langgraph/main/.github/images/logo-light.svg">
+      <img alt="LangGraph Logo" src="https://raw.githubusercontent.com/langchain-ai/langgraph/main/.github/images/logo-light.svg" height="60">
+    </picture>
+  </a>
 </p>
 
 ## License

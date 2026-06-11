@@ -96,13 +96,18 @@ struct SimpleResponse {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting null-drift HRSA multi-tenant daemon...");
 
-    let eviction_listener = |key: Arc<String>, value: Arc<RwLock<ThreadState>>, _cause: moka::notification::RemovalCause| {
+    let eviction_listener = |key: Arc<String>,
+                             value: Arc<RwLock<ThreadState>>,
+                             _cause: moka::notification::RemovalCause| {
         let thread_id = key.to_string();
         tokio::spawn(async move {
             let ts = value.read().await;
             if let Ok(bytes) = bincode::serialize(&*ts) {
                 let _ = tokio::fs::write(format!("state_{}.nd", thread_id), bytes).await;
-                println!("Disk Paging: Saved {} to disk due to inactivity.", thread_id);
+                println!(
+                    "Disk Paging: Saved {} to disk due to inactivity.",
+                    thread_id
+                );
             }
         });
     };
@@ -138,28 +143,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn get_or_load_thread(state: &SharedState, thread_id: &str) -> Result<Arc<RwLock<ThreadState>>, DaemonError> {
+async fn get_or_load_thread(
+    state: &SharedState,
+    thread_id: &str,
+) -> Result<Arc<RwLock<ThreadState>>, DaemonError> {
     if let Some(ts) = state.threads.get(thread_id).await {
         return Ok(ts);
     }
-    
+
     let file_path = format!("state_{}.nd", thread_id);
     if fs::metadata(&file_path).await.is_ok() {
         let bytes = fs::read(&file_path).await?;
         let bincode_opts = bincode::DefaultOptions::new().with_limit(5 * 1024 * 1024);
         if let Ok(ts_data) = bincode_opts.deserialize::<ThreadState>(&bytes) {
             let ts = Arc::new(RwLock::new(ts_data));
-            state.threads.insert(thread_id.to_string(), ts.clone()).await;
+            state
+                .threads
+                .insert(thread_id.to_string(), ts.clone())
+                .await;
             return Ok(ts);
         }
     }
-    
+
     let new_ts = ThreadState {
         amn: AttractorIndex::new(3000),
         hrsa: Hrsa::new(10000),
     };
     let ts = Arc::new(RwLock::new(new_ts));
-    state.threads.insert(thread_id.to_string(), ts.clone()).await;
+    state
+        .threads
+        .insert(thread_id.to_string(), ts.clone())
+        .await;
     Ok(ts)
 }
 
@@ -253,7 +267,7 @@ async fn handle_snapshot(
 ) -> Result<impl IntoResponse, DaemonError> {
     let thread_lock = get_or_load_thread(&state, &query.thread_id).await?;
     let ts = thread_lock.read().await;
-    
+
     let bytes = bincode::serialize(&*ts)?;
     fs::write(format!("state_{}.nd", query.thread_id), &bytes).await?;
 

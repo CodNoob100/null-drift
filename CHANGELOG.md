@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Serialization Framework Migration**: Replaced the deprecated `bincode` serialization library with the highly secure `postcard` framework for `.nd` file checkpointing (Resolves RUSTSEC-2025-0141).
+
+### Security
+- **Python Dependencies Pinned**: Pinned `fastapi`, `pydantic`, `torch`, `uvicorn`, and `requests` in `gateway/requirements.txt` to their latest secure patched versions to resolve multiple severe CVSS vulnerabilities.
 ## [0.2.0] - 2026-06-11
 
 ### Added

@@ -75,10 +75,10 @@ The following benchmarks were generated dynamically on a consumer-grade laptop, 
 - **Memory**: 8.00 GB RAM
 
 ### End-to-End Latency
-- **Average Inject (Write) Latency:** ~41.40 ms *(Heavily bottlenecked by Python embedding generation)*
-- **Fastest Inject:** ~35.04 ms
-- **Average Recall (Read) Latency:** ~20.90 ms
-- **Background Disk Paging (Snapshot):** ~11.91 ms
+- **Average Inject (Write) Latency:** ~43.75 ms *(Heavily bottlenecked by Python embedding generation)*
+- **Fastest Inject:** ~32.91 ms
+- **Average Recall (Read) Latency:** ~20.12 ms
+- **Background Disk Paging (Snapshot):** ~10.40 ms
 
 ### Architectural Scaling Bounds
 - **Total State Memory per Thread:** Strictly **< 50 KB** (Constant $O(1)$).
@@ -96,7 +96,7 @@ The following benchmarks were generated dynamically on a consumer-grade laptop, 
 ## Security & Fault Tolerance
 `null-drift` is hardened for bare-metal production environments:
 * **Chaos-Resilient:** The architecture is mathematically proven to survive massive memory pressure. In testing, the daemon successfully crushed 9,990 pure noise events, preserved the 10 critical causal milestones, and perfectly recalled the dominant attractor even after simulated physical process termination.
-* **OOM & Serialization Protection:** Checkpointing utilizes strict memory bounds limits (`bincode::deserialize`) to prevent Out-Of-Memory (OOM) attacks from corrupted `.nd` state files.
+* **OOM & Serialization Protection:** Checkpointing utilizes strict struct-based bounds via the Embedded WG's `postcard` specification to prevent Out-Of-Memory (OOM) attacks from corrupted `.nd` state files, completely eliminating the deprecated `bincode` system.
 * **Lock-Free Concurrency:** The Rust daemon utilizes `moka::future::Cache` and `tokio::sync::RwLock` over standard Mutexes, entirely eliminating Mutex poisoning vectors and allowing highly concurrent multi-tenant isolation.
 * **Unbound Allocation Defense:** The axum router enforces a strict 64KB `DefaultBodyLimit` to prevent memory exhaustion via payload flooding.
 

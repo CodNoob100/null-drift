@@ -2,7 +2,9 @@ import time
 import requests
 import statistics
 
-GATEWAY_URL = "http://127.0.0.1:8000"
+import os
+
+GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:8000")
 THREAD_ID = "benchmark_thread"
 
 def run_benchmark(num_requests=100):

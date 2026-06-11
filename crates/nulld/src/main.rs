@@ -5,7 +5,7 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
-use bincode::Options;
+
 use moka::future::Cache;
 use ndarray::Array1;
 use null_drift_core::amn::AttractorIndex;
@@ -22,7 +22,7 @@ pub enum DaemonError {
     #[error("Failed to acquire lock")]
     LockError,
     #[error("Serialization/Deserialization failed: {0}")]
-    BincodeError(#[from] bincode::Error),
+    PostcardError(#[from] postcard::Error),
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Invalid embedding dimension")]
@@ -102,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let thread_id = key.to_string();
         tokio::spawn(async move {
             let ts = value.read().await;
-            if let Ok(bytes) = bincode::serialize(&*ts) {
+            if let Ok(bytes) = postcard::to_stdvec(&*ts) {
                 let _ = tokio::fs::write(format!("state_{}.nd", thread_id), bytes).await;
                 println!(
                     "Disk Paging: Saved {} to disk due to inactivity.",
@@ -154,8 +154,7 @@ async fn get_or_load_thread(
     let file_path = format!("state_{}.nd", thread_id);
     if fs::metadata(&file_path).await.is_ok() {
         let bytes = fs::read(&file_path).await?;
-        let bincode_opts = bincode::DefaultOptions::new().with_limit(5 * 1024 * 1024);
-        if let Ok(ts_data) = bincode_opts.deserialize::<ThreadState>(&bytes) {
+        if let Ok(ts_data) = postcard::from_bytes::<ThreadState>(&bytes) {
             let ts = Arc::new(RwLock::new(ts_data));
             state
                 .threads
@@ -268,7 +267,7 @@ async fn handle_snapshot(
     let thread_lock = get_or_load_thread(&state, &query.thread_id).await?;
     let ts = thread_lock.read().await;
 
-    let bytes = bincode::serialize(&*ts)?;
+    let bytes = postcard::to_stdvec(&*ts)?;
     fs::write(format!("state_{}.nd", query.thread_id), &bytes).await?;
 
     Ok((
@@ -286,7 +285,7 @@ async fn handle_restore(
     let file_path = format!("state_{}.nd", query.thread_id);
     if fs::metadata(&file_path).await.is_ok() {
         let bytes = fs::read(&file_path).await?;
-        let ts_data: ThreadState = bincode::deserialize(&bytes)?;
+        let ts_data: ThreadState = postcard::from_bytes(&bytes)?;
 
         // Force overwrite in moka cache
         let ts = Arc::new(RwLock::new(ts_data));

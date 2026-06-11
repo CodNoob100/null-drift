@@ -39,7 +39,7 @@ We commit to the following patch timelines from the date of disclosure:
 
 1. **State Poisoning:** We utilize `tokio::sync::RwLock` specifically to prevent panic-induced lock poisoning. Any vector capable of deadlocking or permanently poisoning the `Hrsa` state is a high-priority vulnerability.
 2. **Denial of Service (DoS):** Any malformed payload that bypasses the Axum `DefaultBodyLimit` (64KB) or causes uncontrolled memory allocation.
-3. **Bincode Deserialization:** Any vulnerability allowing Remote Code Execution (RCE) or arbitrary memory overwrites during the `state.nd` deserialization phase.
+3. **Postcard Deserialization:** Any vulnerability allowing Remote Code Execution (RCE) or arbitrary memory overwrites during the `state.nd` deserialization phase.
 4. **Multi-Tenant State Isolation:** We utilize `moka::future::Cache` to map and isolate distinct AI agents. Any vulnerability allowing Cross-Tenant State Leakage (reading or modifying a `ThreadState` belonging to another `thread_id`) is a critical vulnerability.
 
 If you find a mechanism that violates these boundaries, please report it immediately.

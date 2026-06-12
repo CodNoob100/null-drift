@@ -41,7 +41,7 @@ jobs:
             "enforce_admins": true,
             "required_pull_request_reviews": {
               "dismiss_stale_reviews": false,
-              "require_code_owner_reviews": false,
+              "require_code_owner_reviews": true,
               "required_approving_review_count": 0
             },
             "restrictions": null,
@@ -59,12 +59,12 @@ jobs:
           fetch-depth: 0
 
       - name: Restrict Workflow and Bot Edits
-        if: github.event_name == 'pull_request' && !contains(fromJSON('["OWNER", "COLLABORATOR", "MEMBER"]'), github.event.pull_request.author_association)
+        if: github.event_name == 'pull_request' && github.event.pull_request.author_association != 'OWNER'
         run: |
           git fetch origin main
           CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
-          if echo "$CHANGED_FILES" | grep -qE '^(\.github/workflows/|tools/bots/)'; then
-            echo "ERROR: You do not have permission to modify CI workflows or bots."
+          if echo "$CHANGED_FILES" | grep -qE '^(\.github/|tools/bots/|protection\.json)'; then
+            echo "ERROR: Only the repository admin (OWNER) can modify .github, tools/bots, or protection.json."
             exit 1
           fi
 

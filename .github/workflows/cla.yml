@@ -23,8 +23,8 @@ jobs:
         with:
           path-to-signatures: 'signatures/version1/cla.json'
           path-to-document: 'https://github.com/CodNoob100/null-drift/blob/main/CONTRIBUTING.md' # Links to the CLA text
-          # branch should not be protected
-          branch: 'cla-signatures'
+          # Store signatures on main to avoid conflict with branch deletion policy
+          branch: 'main'
           allowlist: 'bot*,dependabot[bot],github-actions[bot],CodNoob100,prasantadukhu,prasantadukhu@gmail.com'
           
           # Custom Messages

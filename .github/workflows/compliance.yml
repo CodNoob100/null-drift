@@ -145,8 +145,8 @@ jobs:
         run: |
           git fetch origin main
           CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
-          if echo "$CHANGED_FILES" | grep -qE '^(\.github/|tools/bots/|protection\.json)'; then
-            echo "ERROR: Only the repository admin (OWNER) can modify .github, tools/bots, or protection.json."
+          if echo "$CHANGED_FILES" | grep -qE '^(\.github/|tools/bots/|signatures/|protection\.json)'; then
+            echo "ERROR: Only the repository admin (OWNER) can modify .github, tools/bots, signatures, or protection.json."
             exit 1
           fi
 

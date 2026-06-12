@@ -8,7 +8,7 @@
 **A Production-Grade Holographic Reversible State Accumulator (HRSA) for AI Agents.**
 
 <p align="center">
-  <img src="benchmark_memory.png" alt="null-drift vs VectorDB Memory Benchmark" width="800">
+  <img src="docs/assets/benchmark_memory.png" alt="null-drift vs VectorDB Memory Benchmark" width="800">
   <br>
   <em>*Mathematical projection demonstrating the <b>O(1)</b> constant memory bounds of the HRSA architecture vs the <b>O(N)</b> linear scaling of standard VectorDB indices.</em>
 </p>
@@ -96,7 +96,7 @@ To prove that HRSA spaces do not blur under extreme thermodynamic drift, we inje
 During the 10,000 vector bombardment, we hooked `psutil` natively into the `nulld.exe` process to plot its RAM footprint. As shown below, the daemon perfectly bounded 10,000 unique vectors inside a strict ~20MB memory limit, visually proving the $\mathcal{O}(1)$ constant bounds of the mathematics:
 
 <p align="center">
-  <img src="o1_memory_benchmark.png" alt="O(1) Memory Constant Bound Verification" width="800">
+  <img src="docs/assets/o1_memory_benchmark.png" alt="O(1) Memory Constant Bound Verification" width="800">
 </p>
 
 > **Note for Windows Users:** When testing the API manually via PowerShell, always use `curl.exe` instead of `curl` (which aliases to `Invoke-WebRequest` and can hang on HTTP keep-alive streams).

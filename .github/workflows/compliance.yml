@@ -83,12 +83,12 @@ jobs:
       - name: Python Formatting Check (black)
         run: |
           pip install black
-          black --check gateway/ test_final.py docker_load_test.py generate_true_gif.py generate_gif.py || true
+          black --check .
 
       - name: Python Linter Check (flake8)
         run: |
           pip install flake8
-          flake8 gateway/ --max-line-length=120 || true
+          flake8 . --max-line-length=120
 
       - name: Check for duplicate dependencies
         run: |

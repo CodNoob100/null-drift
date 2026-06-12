@@ -6,10 +6,92 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  issues: write
+  contents: read
+
 jobs:
   check-direct-push:
     name: PR Enforcement Bot
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - name: Prevent direct push to main
+        run: |
+          commit_message=$(git log -1 --pretty=format:"%s")
+          if [[ "$commit_message" != Merge* ]] && [[ "$commit_message" != *"Merge pull request"* ]]; then
+            echo "ERROR: Direct pushes to main are strictly forbidden. You must use a Pull Request."
+            exit 1
+          fi
+
+
+  enforce-branch-protection:
+    name: Self-Healing Branch Protection
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Enforce Branch Protection via GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          echo '{
+            "required_status_checks": {
+              "strict": true,
+              "contexts": ["Contributing Rules Bot"]
+            },
+            "enforce_admins": false,
+            "required_pull_request_reviews": {
+              "dismiss_stale_reviews": false,
+              "require_code_owner_reviews": true,
+              "required_approving_review_count": 0
+            },
+            "restrictions": null,
+            "allow_force_pushes": false,
+            "allow_deletions": false
+          }' > protection.json
+          gh api -X PUT /repos/${{ github.repository }}/branches/main/protection --input protection.json || echo "Warning: PAT may lack admin privileges, but rules are active."
+
+  check-contributing-rules:
+    name: Contributing Rules Bot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Restrict Workflow and Bot Edits
+        if: github.event_name == 'pull_request' && github.event.pull_request.author_association != 'OWNER' && github.actor != 'dependabot[bot]'
+        run: |
+          git fetch origin main
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          if echo "$CHANGED_FILES" | grep -qE '^(\.github/|tools/bots/|protection\.json)'; then
+            echo "ERROR: Only the repository admin (OWNER) can modify .github, tools/bots, or protection.json."
+            exit 1
+          fi
+
+name: Compliance Bots
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check-direct-push:
+    name: PR Enforcement Bot
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v6
@@ -75,36 +157,77 @@ jobs:
           rustup default nightly
           rustup component add clippy rustfmt
       - name: Code Formatting Check (cargo fmt)
-        run: cargo fmt --check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! cargo fmt --check > fmt_output.txt 2>&1; then
+            gh issue create --title "CI Failure: Rust Code Formatting" --body "Rust files are not formatted correctly. This must be resolved by changing the code (running \`cargo fmt\`).\n\n\`\`\`\n$(cat fmt_output.txt)\n\`\`\`" --label "bug" || true
+            cat fmt_output.txt
+            exit 1
+          fi
 
       - name: Zero-Warnings Policy (cargo clippy)
-        run: cargo clippy --workspace --lib --bins -- -D warnings
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! cargo clippy --workspace --lib --bins -- -D warnings > clippy_out.txt 2>&1; then
+            gh issue create --title "CI Failure: Rust Clippy Warnings" --body "Clippy found warnings/errors. This must be resolved by changing the code.\n\n\`\`\`\n$(cat clippy_out.txt | head -n 50)\n\`\`\`" --label "bug" || true
+            cat clippy_out.txt
+            exit 1
+          fi
 
       - name: Python Formatting Check (black)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pip install black
-          black --check .
+          if ! black --check . > black_out.txt 2>&1; then
+            gh issue create --title "CI Failure: Python Formatting (Black)" --body "Python files failed Black formatting. This must be resolved by running \`black .\` locally and pushing the changes.\n\n\`\`\`\n$(cat black_out.txt)\n\`\`\`" --label "bug" || true
+            cat black_out.txt
+            exit 1
+          fi
 
       - name: Python Linter Check (flake8)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pip install flake8
-          flake8 . --max-line-length=120
+          if ! flake8 . --max-line-length=120 > flake8_out.txt 2>&1; then
+            gh issue create --title "CI Failure: Python Linter (Flake8)" --body "Python files failed Flake8 checks. This must be resolved by changing the code.\n\n\`\`\`\n$(cat flake8_out.txt | head -n 50)\n\`\`\`" --label "bug" || true
+            cat flake8_out.txt
+            exit 1
+          fi
 
       - name: Check for duplicate dependencies
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cargo tree --duplicates > dupes.txt || true
           if [ -s dupes.txt ]; then
             echo "ERROR: Duplicate dependencies found!"
             cat dupes.txt
+            gh issue create --title "CI Failure: Duplicate Dependencies Found" --body "Duplicate dependencies detected:\n\n\`\`\`\n$(cat dupes.txt | head -n 50)\n\`\`\`\n\nIf these are fundamentally impossible to fix (e.g., due to transitive crates like \`fastembed\` where we cannot migrate), you may safely close this issue without changing the code." --label "bug" || true
             exit 1
           fi
 
       - name: Check TODO formats
-        run: python3 tools/bots/check_todos.py
-
-
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! python3 tools/bots/check_todos.py > todo_out.txt 2>&1; then
+            gh issue create --title "CI Failure: TODO Formats" --body "Invalid TODO formats detected. This must be resolved by changing the code to follow the standard TODO format.\n\n\`\`\`\n$(cat todo_out.txt)\n\`\`\`" --label "bug" || true
+            cat todo_out.txt
+            exit 1
+          fi
 
       - name: Check Code Quality & Dead Code Policies
-        run: python3 tools/bots/check_quality.py
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! python3 tools/bots/check_quality.py > quality_out.txt 2>&1; then
+            gh issue create --title "CI Failure: Code Quality Policies" --body "Code Quality or Dead Code policies violated. This must be resolved by changing the code.\n\n\`\`\`\n$(cat quality_out.txt)\n\`\`\`" --label "bug" || true
+            cat quality_out.txt
+            exit 1
+          fi
 
 

@@ -16,7 +16,7 @@ services:
 
   gateway:
     build:
-      context: ./gateway
+      context: .
       dockerfile: Dockerfile.gateway
     container_name: null-drift-gateway
     ports:

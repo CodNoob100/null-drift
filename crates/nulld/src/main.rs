@@ -12,6 +12,7 @@ use null_drift_core::amn::AttractorIndex;
 use null_drift_core::hrsa::Hrsa;
 use null_drift_core::spl::Projector;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs;
@@ -46,7 +47,7 @@ struct ThreadState {
 }
 
 struct GlobalState {
-    projector: Projector,
+    projectors: RwLock<HashMap<usize, Arc<Projector>>>,
     threads: Cache<String, Arc<RwLock<ThreadState>>>,
 }
 
@@ -118,8 +119,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .eviction_listener(eviction_listener)
         .build();
 
+    let mut projectors = HashMap::new();
+    projectors.insert(384, Arc::new(Projector::new(384, 10000)));
+
     let global_state = GlobalState {
-        projector: Projector::new(384, 10000), // Deterministic seed internally
+        projectors: RwLock::new(projectors),
         threads: cache,
     };
 
@@ -181,15 +185,30 @@ async fn handle_inject(
     Query(query): Query<ThreadQuery>,
     Json(payload): Json<InjectPayload>,
 ) -> Result<impl IntoResponse, DaemonError> {
-    if payload.embedding.len() != 384 {
+    let dim = payload.embedding.len();
+    if dim == 0 {
         return Err(DaemonError::InvalidDimension);
     }
+
+    let projector = {
+        let read_guard = state.projectors.read().await;
+        if let Some(p) = read_guard.get(&dim) {
+            Arc::clone(p)
+        } else {
+            drop(read_guard);
+            let mut write_guard = state.projectors.write().await;
+            Arc::clone(write_guard.entry(dim).or_insert_with(|| {
+                println!("Dynamically instantiating projector for dimension: {}", dim);
+                Arc::new(Projector::new(dim, 10000))
+            }))
+        }
+    };
 
     let thread_lock = get_or_load_thread(&state, &query.thread_id).await?;
     let mut ts = thread_lock.write().await;
 
     let dense_emb = Array1::from_vec(payload.embedding);
-    let bipolar_event = state.projector.project_to_hypervector(dense_emb);
+    let bipolar_event = projector.project_to_hypervector(dense_emb);
 
     if payload.salience >= 0.90 {
         ts.amn.store(bipolar_event.clone(), payload.text.clone());
@@ -216,7 +235,6 @@ async fn handle_recall(
     let ts = thread_lock.read().await;
 
     let mut best_text = None;
-    let mut best_score = 0.0;
 
     if let Some(steps) = query.steps_ago {
         if steps < ts.hrsa.step {
@@ -226,28 +244,25 @@ async fn handle_recall(
             }
         }
     } else {
-        for steps in 0..ts.hrsa.step {
-            let noisy_hv = ts.hrsa.recall_event(steps);
-            let mut local_best = None;
-            let mut local_min_hamming = usize::MAX;
+        // O(1) Recall: Find the dominant attractor in the current state without looping back in time!
+        let noisy_hv: Vec<f32> = ts
+            .hrsa
+            .active_state
+            .iter()
+            .map(|&x| if x >= 0.0 { 1.0 } else { -1.0 })
+            .collect();
+        let mut local_min_hamming = usize::MAX;
 
-            for (clean_hv, concept) in &ts.amn.attractors {
-                let mut hamming = 0;
-                for i in 0..noisy_hv.len() {
-                    if noisy_hv[i] != clean_hv[i] {
-                        hamming += 1;
-                    }
-                }
-                if hamming < local_min_hamming {
-                    local_min_hamming = hamming;
-                    local_best = Some(concept.clone());
+        for (clean_hv, concept) in &ts.amn.attractors {
+            let mut hamming = 0;
+            for i in 0..noisy_hv.len() {
+                if noisy_hv[i] != clean_hv[i] {
+                    hamming += 1;
                 }
             }
-
-            let similarity_score = 10000.0 - (local_min_hamming as f32);
-            if similarity_score > best_score {
-                best_score = similarity_score;
-                best_text = local_best;
+            if hamming < local_min_hamming {
+                local_min_hamming = hamming;
+                best_text = Some(concept.clone());
             }
         }
     }

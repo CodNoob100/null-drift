@@ -1,7 +1,7 @@
 import httpx
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 # Protocol Stubs (Assuming CrewAI and LangGraph are installed in the user's environment)
@@ -18,9 +18,11 @@ class NullDriftCrewStorage(StorageBackend):
         self,
         gateway_url: str = "http://127.0.0.1:8000",
         thread_id: str = "default_crew",
+        embedding_function: Optional[Callable[[str], List[float]]] = None,
     ):
         self.gateway_url = gateway_url.rstrip("/")
         self.thread_id = thread_id
+        self.embedding_function = embedding_function
 
     def save(self, payload: Dict[str, Any]) -> None:
         """Injects the payload into the continuous state."""
@@ -29,6 +31,14 @@ class NullDriftCrewStorage(StorageBackend):
             "text": text_payload,
             "salience": 1.0,  # Force high salience to ensure it locks into the AMN index
         }
+
+        if self.embedding_function:
+            try:
+                data["embedding"] = self.embedding_function(text_payload)
+            except Exception as e:
+                logging.error(f"Failed to generate embedding locally: {e}")
+                return
+
         try:
             with httpx.Client() as client:
                 res = client.post(
@@ -84,8 +94,13 @@ class NullDriftCrewStorage(StorageBackend):
 
 
 class NullDriftLangGraphStore(BaseStore):
-    def __init__(self, gateway_url: str = "http://127.0.0.1:8000"):
+    def __init__(
+        self,
+        gateway_url: str = "http://127.0.0.1:8000",
+        embedding_function: Optional[Callable[[str], List[float]]] = None,
+    ):
         self.gateway_url = gateway_url.rstrip("/")
+        self.embedding_function = embedding_function
         self.client = httpx.AsyncClient(timeout=5.0)
 
     async def aput(
@@ -98,6 +113,14 @@ class NullDriftLangGraphStore(BaseStore):
         thread_id = "_".join(namespace)
         text_payload = json.dumps({"key": key, "value": value})
         data = {"text": text_payload, "salience": 1.0}
+
+        if self.embedding_function:
+            try:
+                data["embedding"] = self.embedding_function(text_payload)
+            except Exception as e:
+                logging.error(f"Failed to generate embedding locally: {e}")
+                return
+
         try:
             res = await self.client.post(
                 f"{self.gateway_url}/inject", params={"thread_id": thread_id}, json=data

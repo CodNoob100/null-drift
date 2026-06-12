@@ -45,6 +45,13 @@ ehthumbs.db
 Thumbs.db
 *.dll
 
+# Null Drift Data and State Files
+*.nd
+*.json
+*.dll
+*.zip
+Cargo.lock
+
 # null-drift specific data
 state.nd
 models/

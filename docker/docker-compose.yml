@@ -3,8 +3,8 @@ version: '3.8'
 services:
   nulld:
     build:
-      context: .
-      dockerfile: Dockerfile.nulld
+      context: ..
+      dockerfile: docker/Dockerfile.nulld
     container_name: null-drift-core
     expose:
       - "3000"
@@ -16,8 +16,8 @@ services:
 
   gateway:
     build:
-      context: .
-      dockerfile: Dockerfile.gateway
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
     container_name: null-drift-gateway
     ports:
       - "127.0.0.1:8000:8000"

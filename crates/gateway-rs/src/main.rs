@@ -98,14 +98,14 @@ async fn inject_memory(
         let mut embedder = embedder.lock().unwrap();
         embedder.embed(vec![&text], None)
     })
-        .await
-        .unwrap()
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Embedding failed: {}", e),
-            )
-        })?;
+    .await
+    .unwrap()
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Embedding failed: {}", e),
+        )
+    })?;
 
     let embedding = embeddings.into_iter().next().unwrap();
 

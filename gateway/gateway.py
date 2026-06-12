@@ -2,10 +2,11 @@ import requests
 import uuid
 from sentence_transformers import SentenceTransformer
 
+
 class CognitiveGateway:
     def __init__(self, rust_daemon_url="http://127.0.0.1:3000"):
         print("Initializing SentenceTransformer (all-MiniLM-L6-v2)...")
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.model = SentenceTransformer("all-MiniLM-L6-v2")
         self.daemon_url = rust_daemon_url
         print(f"CognitiveGateway connected to {self.daemon_url}")
 
@@ -15,14 +16,14 @@ class CognitiveGateway:
         """
         print(f"--> Encoding: '{text}' (salience={salience})")
         embedding = self.model.encode(text).tolist()
-        
+
         payload = {
             "id": str(uuid.uuid4()),
             "text": text,
             "embedding": embedding,
-            "salience": salience
+            "salience": salience,
         }
-        
+
         try:
             response = requests.post(f"{self.daemon_url}/inject", json=payload)
             response.raise_for_status()
@@ -40,7 +41,7 @@ class CognitiveGateway:
             response.raise_for_status()
             data = response.json()
             print(f"    [Result] Dominant Attractor: {data.get('recovered_text')}")
-            return data.get('recovered_text')
+            return data.get("recovered_text")
         except Exception as e:
             print(f"    [Error] Failed to recall: {e}")
             return None

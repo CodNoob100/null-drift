@@ -161,7 +161,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if ! cargo fmt --check > fmt_output.txt 2>&1; then
-            gh issue create --title "CI Failure: Rust Code Formatting" --body "Rust files are not formatted correctly. This must be resolved by changing the code (running \`cargo fmt\`).\n\n\`\`\`\n$(cat fmt_output.txt)\n\`\`\`" --label "bug" || true
+            gh issue create --title "CI Failure: Rust Code Formatting" --body "Rust files are not formatted correctly. This must be resolved by changing the code (running \`cargo fmt\`).\n\n\`\`\`\n$(cat fmt_output.txt)\n\`\`\`\n\ncc @${{ github.actor }}" --label "bug" || true
             cat fmt_output.txt
             exit 1
           fi
@@ -171,7 +171,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if ! cargo clippy --workspace --lib --bins -- -D warnings > clippy_out.txt 2>&1; then
-            gh issue create --title "CI Failure: Rust Clippy Warnings" --body "Clippy found warnings/errors. This must be resolved by changing the code.\n\n\`\`\`\n$(cat clippy_out.txt | head -n 50)\n\`\`\`" --label "bug" || true
+            gh issue create --title "CI Failure: Rust Clippy Warnings" --body "Clippy found warnings/errors. This must be resolved by changing the code.\n\n\`\`\`\n$(cat clippy_out.txt | head -n 50)\n\`\`\`\n\ncc @${{ github.actor }}" --label "bug" || true
             cat clippy_out.txt
             exit 1
           fi
@@ -182,7 +182,7 @@ jobs:
         run: |
           pip install black
           if ! black --check . > black_out.txt 2>&1; then
-            gh issue create --title "CI Failure: Python Formatting (Black)" --body "Python files failed Black formatting. This must be resolved by running \`black .\` locally and pushing the changes.\n\n\`\`\`\n$(cat black_out.txt)\n\`\`\`" --label "bug" || true
+            gh issue create --title "CI Failure: Python Formatting (Black)" --body "Python files failed Black formatting. This must be resolved by running \`black .\` locally and pushing the changes.\n\n\`\`\`\n$(cat black_out.txt)\n\`\`\`\n\ncc @${{ github.actor }}" --label "bug" || true
             cat black_out.txt
             exit 1
           fi
@@ -193,7 +193,7 @@ jobs:
         run: |
           pip install flake8
           if ! flake8 . --max-line-length=120 > flake8_out.txt 2>&1; then
-            gh issue create --title "CI Failure: Python Linter (Flake8)" --body "Python files failed Flake8 checks. This must be resolved by changing the code.\n\n\`\`\`\n$(cat flake8_out.txt | head -n 50)\n\`\`\`" --label "bug" || true
+            gh issue create --title "CI Failure: Python Linter (Flake8)" --body "Python files failed Flake8 checks. This must be resolved by changing the code.\n\n\`\`\`\n$(cat flake8_out.txt | head -n 50)\n\`\`\`\n\ncc @${{ github.actor }}" --label "bug" || true
             cat flake8_out.txt
             exit 1
           fi
@@ -206,7 +206,7 @@ jobs:
           if [ -s dupes.txt ]; then
             echo "ERROR: Duplicate dependencies found!"
             cat dupes.txt
-            gh issue create --title "CI Failure: Duplicate Dependencies Found" --body "Duplicate dependencies detected:\n\n\`\`\`\n$(cat dupes.txt | head -n 50)\n\`\`\`\n\nIf these are fundamentally impossible to fix (e.g., due to transitive crates like \`fastembed\` where we cannot migrate), you may safely close this issue without changing the code." --label "bug" || true
+            gh issue create --title "CI Failure: Duplicate Dependencies Found" --body "Duplicate dependencies detected:\n\n\`\`\`\n$(cat dupes.txt | head -n 50)\n\`\`\`\n\nIf these are fundamentally impossible to fix (e.g., due to transitive crates like \`fastembed\` where we cannot migrate), you may safely close this issue without changing the code.\n\ncc @${{ github.actor }}" --label "bug" || true
             exit 1
           fi
 
@@ -215,7 +215,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if ! python3 tools/bots/check_todos.py > todo_out.txt 2>&1; then
-            gh issue create --title "CI Failure: TODO Formats" --body "Invalid TODO formats detected. This must be resolved by changing the code to follow the standard TODO format.\n\n\`\`\`\n$(cat todo_out.txt)\n\`\`\`" --label "bug" || true
+            gh issue create --title "CI Failure: TODO Formats" --body "Invalid TODO formats detected. This must be resolved by changing the code to follow the standard TODO format.\n\n\`\`\`\n$(cat todo_out.txt)\n\`\`\`\n\ncc @${{ github.actor }}" --label "bug" || true
             cat todo_out.txt
             exit 1
           fi
@@ -225,7 +225,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if ! python3 tools/bots/check_quality.py > quality_out.txt 2>&1; then
-            gh issue create --title "CI Failure: Code Quality Policies" --body "Code Quality or Dead Code policies violated. This must be resolved by changing the code.\n\n\`\`\`\n$(cat quality_out.txt)\n\`\`\`" --label "bug" || true
+            gh issue create --title "CI Failure: Code Quality Policies" --body "Code Quality or Dead Code policies violated. This must be resolved by changing the code.\n\n\`\`\`\n$(cat quality_out.txt)\n\`\`\`\n\ncc @${{ github.actor }}" --label "bug" || true
             cat quality_out.txt
             exit 1
           fi

@@ -99,6 +99,13 @@ During the 10,000 vector bombardment, we hooked `psutil` natively into the `null
   <img src="docs/assets/o1_memory_benchmark.png" alt="O(1) Memory Constant Bound Verification" width="800">
 </p>
 
+### 3. API Token Cost Savings
+Standard agent frameworks suffer from exponentially growing API billing costs due to linear context accumulation (where every turn appends the previous history to the prompt). Because the `null-drift` HRSA architecture mathematically projects meaning into a constant 10,000-dimensional state array, the context window remains completely flat, generating massive cost savings over extended multi-agent conversations:
+
+<p align="center">
+  <img src="docs/assets/token_diff_benchmark.png" alt="Token Accumulation Benchmark" width="800">
+</p>
+
 > **Note for Windows Users:** When testing the API manually via PowerShell, always use `curl.exe` instead of `curl` (which aliases to `Invoke-WebRequest` and can hang on HTTP keep-alive streams).
 
 ## The Physics (How it Works)

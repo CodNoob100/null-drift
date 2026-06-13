@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Token Accumulation Benchmark Script**: Added `scripts/token_benchmark.py` to accurately simulate and visually graph the massive API cost savings of the $\mathcal{O}(1)$ projection array vs standard linear context window accumulation across 100 consecutive agent turns.
 - **Decoupled Rust Architecture**: Completely replaced the Python FastAPI gateway with `gateway-rs`, a native Rust microservice using `axum` and the C++ ONNX runtime (`fastembed`). Achieves an end-to-end embedding injection pipeline in under 31ms.
 - **Dimension-Agnostic Engine**: `nulld` no longer hardcodes 384 dimensions. It natively detects the dimensionality of incoming vectors and dynamically instantiates matching $W_{proj}$ mathematical Phase Space matrices on-the-fly.
 - **Bring-Your-Own-Embedding (BYOE)**: Python SDK adapters (`NullDriftCrewStorage` and `NullDriftLangGraphStore`) now accept an optional `embedding_function`. If provided, embeddings are generated strictly on the client (e.g., using OpenAI or local Ollama) and injected straight to `nulld`, completely bypassing the gateway.

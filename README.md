@@ -8,9 +8,9 @@
 **A Production-Grade Holographic Reversible State Accumulator (HRSA) for AI Agents.**
 
 <p align="center">
-  <img src="docs/assets/benchmark_memory.png" alt="null-drift vs VectorDB Memory Benchmark" width="800">
+  <img src="docs/assets/token_diff_benchmark.png" alt="Token Accumulation Benchmark" width="800">
   <br>
-  <em>*Mathematical projection demonstrating the <b>O(1)</b> constant memory bounds of the HRSA architecture vs the <b>O(N)</b> linear scaling of standard VectorDB indices.</em>
+  <em>*Standard agent frameworks suffer from exponentially growing API billing costs due to linear context accumulation. The null-drift architecture generates massive cost savings by providing infinite agent memory using a constant flat-rate mathematical phase space projection.</em>
 </p>
 
 `null-drift` is a bare-metal cognitive memory metabolism. It bridges the gap between massive LLM semantic outputs and mathematical hyperdimensional phase spaces, granting AI agents persistent, continuous, and computationally cheap episodic memory.
@@ -63,66 +63,6 @@ Deserialize a binary checkpoint back into the daemon's L1 RAM:
 curl -X POST "http://localhost:8000/restore?thread_id=agent_007"
 ```
 
-## Performance Benchmarks
-
-`null-drift` was subjected to rigorous stress testing over 50 recursive injections and recalls. The results prove the sheer mathematical dominance of the HRSA architecture:
-
-### Hardware Environment
-Because `null-drift` operates natively within the Rust daemon, the system utilizes the highly optimized C++ ONNX runtime (`fastembed`) for lightning fast inference.
-
-The following benchmarks were generated dynamically on a consumer-grade laptop, proving that `null-drift` requires absolutely no expensive GPU infrastructure to achieve sub-50ms causal memory bounds:
-- **OS**: Windows 10 (Docker WSL2 Engine v29.4.3)
-- **Memory**: 8.00 GB RAM
-
-### L1 Single-Thread Latency Benchmarks
-- **Average Inject (Write) Latency:** ~30.61 ms
-- **Fastest Inject:** ~18.72 ms
-- **Average Recall (Read) Latency:** ~1.02 ms
-- **Background Disk Paging (Snapshot):** ~4.91 ms
-
-### Mathematical Scaling Bounds
-- **Total State Memory per Thread:** Strictly **< 50 KB** (Constant `O(1)`).
-- **Dynamic Global Context:** Lazily instantiated projector matrices (`15 MB` each based on dimension size) shared safely across all threads.
-- **Time Complexity:** `O(1)` mathematically bounded. The `/recall` endpoint executes exactly 1 Hamming Distance comparison across the active state regardless of history size.
-
-## Advanced Mathematical Benchmarking
-
-We pushed the HRSA architecture to its absolute mathematical limits using an asynchronous barrage of 10,000 concurrent threads. 
-
-### 1. The Needle-in-a-Haystack Retention Test
-To prove that HRSA spaces do not blur under extreme thermodynamic drift, we injected a high-salience "Needle" followed immediately by **10,000 low-salience noise vectors** into the exact same thread. The `nulld` daemon geometrically shifted the memory array 10,000 times. Upon `/recall`, the system recovered the Needle perfectly in microseconds, proving immunity to catastrophic interference.
-
-### 2. The $\mathcal{O}(1)$ Memory Footprint
-During the 10,000 vector bombardment, we hooked `psutil` natively into the `nulld.exe` process to plot its RAM footprint. As shown below, the daemon perfectly bounded 10,000 unique vectors inside a strict ~20MB memory limit, visually proving the $\mathcal{O}(1)$ constant bounds of the mathematics:
-
-<p align="center">
-  <img src="docs/assets/o1_memory_benchmark.png" alt="O(1) Memory Constant Bound Verification" width="800">
-</p>
-
-### 3. API Token Cost Savings
-Standard agent frameworks suffer from exponentially growing API billing costs due to linear context accumulation (where every turn appends the previous history to the prompt). Because the `null-drift` HRSA architecture mathematically projects meaning into a constant 10,000-dimensional state array, the context window remains completely flat, generating massive cost savings over extended multi-agent conversations:
-
-<p align="center">
-  <img src="docs/assets/token_diff_benchmark.png" alt="Token Accumulation Benchmark" width="800">
-</p>
-
-> **Note for Windows Users:** When testing the API manually via PowerShell, always use `curl.exe` instead of `curl` (which aliases to `Invoke-WebRequest` and can hang on HTTP keep-alive streams).
-
-## The Physics (How it Works)
-
-1. **Projection**: A 384D dense embedding is multiplied by a Deterministic Gaussian Random Matrix ($W_{proj}$), projecting it into an approximately orthogonal 10,000D float space.
-2. **Bipolar Activation**: `signum()` converts the projection strictly to $\{-1.0, 1.0\}$, guaranteeing holographic sparsity.
-3. **Continuous Salience Binding**: The active state ($M_t$) remains an array of $f32$. The new event ($E_t$) is scaled by a scalar `salience` and added to $M_t$. Over thousands of steps, high-salience values compound into massive spikes while random noise geometrically cancels out.
-4. **Permutation**: Between every injection, the entire 10,000D phase space is circularly shifted right (`permute`), mathematically representing the passage of time.
-5. **Autonomous L4 Anchor Generation**: Low-salience events are fractionally superimposed into the continuous state (causing thermodynamic "noise drift") but are never assigned physical anchor representations. If an event crosses the high-salience threshold (e.g., `>= 0.90`), its bipolar vector is permanently locked into the `AttractorIndex` as an immutable L4 Anchor, severely restricting the memory footprint and enabling instantaneous cosine-similarity cleanup.
-
-## Security & Fault Tolerance
-`null-drift` is hardened for bare-metal production environments:
-* **Chaos-Resilient:** The architecture is mathematically proven to survive massive memory pressure. In testing, the daemon successfully crushed 9,990 pure noise events, preserved the 10 critical causal milestones, and perfectly recalled the dominant attractor even after simulated physical process termination.
-* **OOM & Serialization Protection:** Checkpointing utilizes strict struct-based bounds via the Embedded WG's `postcard` specification to prevent Out-Of-Memory (OOM) attacks from corrupted `.nd` state files, completely eliminating the deprecated `bincode` system.
-* **Lock-Free Concurrency:** The Rust daemon utilizes `moka::future::Cache` and `tokio::sync::RwLock` over standard Mutexes, entirely eliminating Mutex poisoning vectors and allowing highly concurrent multi-tenant isolation.
-* **Unbound Allocation Defense:** The axum router enforces a strict 64KB `DefaultBodyLimit` to prevent memory exhaustion via payload flooding.
-
 ## Integrations
 
 `null-drift` seamlessly integrates with modern AI agent orchestration frameworks to provide infinite context memory out-of-the-box.
@@ -138,6 +78,53 @@ Standard agent frameworks suffer from exponentially growing API billing costs du
     </picture>
   </a>
 </p>
+
+## The Mathematical Proof (Benchmarks)
+
+`null-drift` was subjected to rigorous stress testing over 50 recursive injections and recalls. The results prove the sheer mathematical dominance of the HRSA architecture.
+
+Because `null-drift` operates natively within the Rust daemon, the system utilizes the highly optimized C++ ONNX runtime (`fastembed`) for lightning fast inference. The following benchmarks were generated dynamically on a consumer-grade laptop, proving that `null-drift` requires absolutely no expensive GPU infrastructure to achieve sub-50ms causal memory bounds.
+
+### L1 Single-Thread Latency Benchmarks
+- **Average Inject (Write) Latency:** ~30.61 ms
+- **Fastest Inject:** ~18.72 ms
+- **Average Recall (Read) Latency:** ~1.02 ms
+- **Background Disk Paging (Snapshot):** ~4.91 ms
+
+### The Needle-in-a-Haystack Retention Test
+To prove that HRSA spaces do not blur under extreme thermodynamic drift, we injected a high-salience "Needle" followed immediately by **10,000 low-salience noise vectors** into the exact same thread. The `nulld` daemon geometrically shifted the memory array 10,000 times. Upon `/recall`, the system recovered the Needle perfectly in microseconds, proving immunity to catastrophic interference.
+
+### The $\mathcal{O}(1)$ Memory Footprint
+During the 10,000 vector bombardment, we hooked `psutil` natively into the `nulld.exe` process to plot its RAM footprint. As shown below, the daemon perfectly bounded 10,000 unique vectors inside a strict ~20MB memory limit, visually proving the $\mathcal{O}(1)$ constant bounds of the mathematics:
+
+<p align="center">
+  <img src="docs/assets/o1_memory_benchmark.png" alt="O(1) Memory Constant Bound Verification" width="800">
+</p>
+
+> **Note for Windows Users:** When testing the API manually via PowerShell, always use `curl.exe` instead of `curl` (which aliases to `Invoke-WebRequest` and can hang on HTTP keep-alive streams).
+
+## The Physics (How it Works)
+
+The massive scaling bounds of the HRSA daemon are derived entirely from vector physics rather than traditional semantic indexing.
+
+<p align="center">
+  <img src="docs/assets/benchmark_memory.png" alt="null-drift vs VectorDB Memory Benchmark" width="800">
+  <br>
+  <em>*Mathematical projection demonstrating the <b>O(1)</b> constant memory bounds of the HRSA architecture vs the <b>O(N)</b> linear scaling of standard VectorDB indices.</em>
+</p>
+
+1. **Projection**: A dense ML embedding is multiplied by a Deterministic Gaussian Random Matrix ($W_{proj}$), projecting it into an approximately orthogonal 10,000D float space.
+2. **Bipolar Activation**: `signum()` converts the projection strictly to $\{-1.0, 1.0\}$, guaranteeing holographic sparsity.
+3. **Continuous Salience Binding**: The active state ($M_t$) remains an array of $f32$. The new event ($E_t$) is scaled by a scalar `salience` and added to $M_t$. Over thousands of steps, high-salience values compound into massive spikes while random noise geometrically cancels out.
+4. **Permutation**: Between every injection, the entire 10,000D phase space is circularly shifted right (`permute`), mathematically representing the passage of time.
+5. **Autonomous L4 Anchor Generation**: Low-salience events are fractionally superimposed into the continuous state (causing thermodynamic "noise drift") but are never assigned physical anchor representations. If an event crosses the high-salience threshold (e.g., `>= 0.90`), its bipolar vector is permanently locked into the `AttractorIndex` as an immutable L4 Anchor, severely restricting the memory footprint and enabling instantaneous cosine-similarity cleanup.
+
+## Security & Fault Tolerance
+`null-drift` is hardened for bare-metal production environments:
+* **Chaos-Resilient:** The architecture is mathematically proven to survive massive memory pressure. In testing, the daemon successfully crushed 9,990 pure noise events, preserved the 10 critical causal milestones, and perfectly recalled the dominant attractor even after simulated physical process termination.
+* **OOM & Serialization Protection:** Checkpointing utilizes strict struct-based bounds via the Embedded WG's `postcard` specification to prevent Out-Of-Memory (OOM) attacks from corrupted `.nd` state files, completely eliminating the deprecated `bincode` system.
+* **Lock-Free Concurrency:** The Rust daemon utilizes `moka::future::Cache` and `tokio::sync::RwLock` over standard Mutexes, entirely eliminating Mutex poisoning vectors and allowing highly concurrent multi-tenant isolation.
+* **Unbound Allocation Defense:** The axum router enforces a strict 64KB `DefaultBodyLimit` to prevent memory exhaustion via payload flooding.
 
 ## License
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.

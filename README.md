@@ -7,6 +7,7 @@
 
 **A Production-Grade Holographic Reversible State Accumulator (HRSA) for AI Agents.**
 
+### Massive API Token Cost Savings
 <p align="center">
   <img src="docs/assets/token_diff_benchmark.png" alt="Token Accumulation Benchmark" width="800">
   <br>
@@ -100,6 +101,11 @@ During the 10,000 vector bombardment, we hooked `psutil` natively into the `null
 <p align="center">
   <img src="docs/assets/o1_memory_benchmark.png" alt="O(1) Memory Constant Bound Verification" width="800">
 </p>
+
+### The $\mathcal{O}(1)$ API Token Savings
+We wrote a dedicated token simulation (`scripts/token_benchmark.py`) using `tiktoken` to measure the API billing cost of `null-drift` against standard LLM context windows over 100 consecutive agent turns. 
+
+As visualized in the **"Massive API Token Cost Savings"** graph at the very top of this README, the standard append-only method scales linearly, destroying API budgets. In contrast, the HRSA daemon maintains a strictly flat context window, saving hundreds of thousands of tokens per conversation thread.
 
 > **Note for Windows Users:** When testing the API manually via PowerShell, always use `curl.exe` instead of `curl` (which aliases to `Invoke-WebRequest` and can hang on HTTP keep-alive streams).
 

@@ -8,8 +8,8 @@ use axum::{
 use fastembed::{InitOptions, TextEmbedding};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 struct AppState {
@@ -51,12 +51,16 @@ struct DaemonPayload {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let num_models = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let num_models = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
     println!("Loading {} fastembed models for concurrency...", num_models);
-    
+
     let mut models = Vec::new();
     for _ in 0..num_models {
-        models.push(Mutex::new(TextEmbedding::try_new(InitOptions::new(fastembed::EmbeddingModel::AllMiniLML6V2))?));
+        models.push(Mutex::new(TextEmbedding::try_new(InitOptions::new(
+            fastembed::EmbeddingModel::AllMiniLML6V2,
+        ))?));
     }
 
     let nulld_url =

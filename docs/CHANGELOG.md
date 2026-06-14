@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bring-Your-Own-Embedding (BYOE)**: Python SDK adapters (`NullDriftCrewStorage` and `NullDriftLangGraphStore`) now accept an optional `embedding_function`. If provided, embeddings are generated strictly on the client (e.g., using OpenAI or local Ollama) and injected straight to `nulld`, completely bypassing the gateway.
 
 ### Changed
+- **Lock-Free Object Pool**: Removed the massive `Mutex` bottleneck around the `fastembed` ONNX model in `gateway-rs`. Implemented a lock-free round-robin object pool that scales embedding inference instances to available CPU cores, boosting throughput from 15 RPS to ~90 RPS.
 - **Serialization Framework Migration**: Replaced the deprecated `bincode` serialization library with the highly secure `postcard` framework for `.nd` file checkpointing (Resolves RUSTSEC-2025-0141).
 
 ### Removed

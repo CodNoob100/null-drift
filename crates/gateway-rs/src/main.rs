@@ -8,11 +8,13 @@ use axum::{
 use fastembed::{InitOptions, TextEmbedding};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 struct AppState {
-    embedder: Arc<Mutex<TextEmbedding>>,
+    embedders: Arc<Vec<Mutex<TextEmbedding>>>,
+    index: Arc<AtomicUsize>,
     client: Client,
     nulld_url: String,
 }
@@ -49,14 +51,24 @@ struct DaemonPayload {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    println!("Loading fastembed model...");
-    let model = TextEmbedding::try_new(InitOptions::new(fastembed::EmbeddingModel::AllMiniLML6V2))?;
+    let num_models = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    println!("Loading {} fastembed models for concurrency...", num_models);
+
+    let mut models = Vec::new();
+    for _ in 0..num_models {
+        models.push(Mutex::new(TextEmbedding::try_new(InitOptions::new(
+            fastembed::EmbeddingModel::AllMiniLML6V2,
+        ))?));
+    }
 
     let nulld_url =
         std::env::var("NULLD_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
 
     let state = AppState {
-        embedder: Arc::new(Mutex::new(model)),
+        embedders: Arc::new(models),
+        index: Arc::new(AtomicUsize::new(0)),
         client: Client::new(),
         nulld_url,
     };
@@ -92,10 +104,11 @@ async fn inject_memory(
     Json(payload): Json<TextRequest>,
 ) -> Result<Response, (StatusCode, String)> {
     let text = payload.text.clone();
-    let embedder = state.embedder.clone();
+    let embedders = state.embedders.clone();
+    let idx = state.index.fetch_add(1, Ordering::Relaxed) % embedders.len();
 
     let embeddings = tokio::task::spawn_blocking(move || {
-        let mut embedder = embedder.lock().unwrap();
+        let mut embedder = embedders[idx].lock().unwrap();
         embedder.embed(vec![&text], None)
     })
     .await

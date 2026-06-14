@@ -1,0 +1,1 @@
+The current integration test (`scripts/test_final.py`) is a raw Python script that manually runs `requests.get()` and prints the output. Refactor this into a structured `test_integration.py` file using the `pytest` framework, adding proper `assert` statements and a setup fixture to wait for the gateway to come online.

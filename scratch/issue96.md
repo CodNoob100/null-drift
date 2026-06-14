@@ -1,0 +1,1 @@
+The current `scripts/benchmark.py` tests injection latency sequentially in a `for` loop. Since the new Rust daemon is highly concurrent, this doesn't test its true throughput. Create a new `async_benchmark.py` script using `asyncio.gather` and `httpx.AsyncClient` to bombard the Gateway with hundreds of simultaneous concurrent requests to measure maximum requests-per-second (RPS).

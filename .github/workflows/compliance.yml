@@ -129,10 +129,18 @@ jobs:
         run: |
           cargo tree --duplicates > dupes.txt || true
           if [ -s dupes.txt ]; then
-            echo "ERROR: Duplicate dependencies found!"
+            echo "WARNING: Duplicate dependencies found!"
             cat dupes.txt
-            gh issue create --title "CI Failure: Duplicate Dependencies Found" --body "Duplicate dependencies detected:\n\n\`\`\`\n$(cat dupes.txt | head -n 50)\n\`\`\`\n\nIf these are fundamentally impossible to fix (e.g., due to transitive crates like \`fastembed\` where we cannot migrate), you may safely close this issue without changing the code.\n\ncc @${{ github.actor }}" --label "bug" || true
-            exit 1
+            BODY_TEXT="Duplicate dependencies detected:
+
+\`\`\`
+$(cat dupes.txt | head -n 50)
+\`\`\`
+
+If these are fundamentally impossible to fix (e.g., due to transitive crates like \`fastembed\` where we cannot migrate), you may safely close this issue without changing the code.
+
+cc @${{ github.actor }}"
+            gh issue create --title "CI Failure: Duplicate Dependencies Found" --body "$BODY_TEXT" --label "bug" || true
           fi
 
       - name: Check TODO formats

@@ -8,24 +8,34 @@ from nulldrift_agents import NullDriftCrewStorage, NullDriftLangGraphStore
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://127.0.0.1:8000")
 
 # Wait for gateway to fully boot (Sentence Transformers takes ~10s to load)
-print("Waiting for gateway to boot...")
-for i in range(30):
-    try:
-        httpx.get(f"{GATEWAY_URL}/")
-        print("Gateway is up!")
-        break
-    except httpx.ConnectError:
-        time.sleep(1)
-else:
-    print("Gateway failed to boot in time!")
+
+
+@pytest.fixture(scope="session")
+def gateway_ready():
+    """Wait for the gateway to become available."""
+
+    for _ in range(30):
+        try:
+            httpx.get(f"{GATEWAY_URL}/")
+            return
+        except httpx.ConnectError:
+            time.sleep(1)
+
+    pytest.fail("Gateway failed to boot in time")
 
 
 @pytest.mark.asyncio
-async def test_crew_ai_storage():
-    storage = NullDriftCrewStorage(gateway_url=GATEWAY_URL, thread_id="test_crew_1")
+async def test_crew_ai_storage(gateway_ready):
+    storage = NullDriftCrewStorage(
+        gateway_url=GATEWAY_URL,
+        thread_id="test_crew_1",
+    )
 
     # Save payload
-    payload = {"role": "researcher", "content": "The null-drift daemon uses HRSA."}
+    payload = {
+        "role": "researcher",
+        "content": "The null-drift daemon uses HRSA.",
+    }
     storage.save(payload)
 
     # Wait for processing
@@ -38,8 +48,10 @@ async def test_crew_ai_storage():
 
 
 @pytest.mark.asyncio
-async def test_langgraph_store():
-    store = NullDriftLangGraphStore(gateway_url=GATEWAY_URL)
+async def test_langgraph_store(gateway_ready):
+    store = NullDriftLangGraphStore(
+        gateway_url=GATEWAY_URL,
+    )
     namespace = ("test", "langgraph", "agent1")
 
     # Async put

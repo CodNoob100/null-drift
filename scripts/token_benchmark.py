@@ -2,10 +2,15 @@ import json
 import tiktoken
 from faker import Faker
 import matplotlib.pyplot as plt
-import matplotlib.style as style
 
 
 def generate_agent_response(fake: Faker):
+    error_trace = (
+        f"Error in module {fake.file_path()}:\n"
+        f"Traceback (most recent call last):\n"
+        f'  File "{fake.file_name()}", line {fake.random_int(1, 500)}, '
+        f"in {fake.word()}\n{fake.sentence()}"
+    )
     return {
         "reasoning": fake.paragraph(nb_sentences=3),
         "tool_name": fake.word() + "_tool",
@@ -14,7 +19,7 @@ def generate_agent_response(fake: Faker):
             "arg2": fake.random_int(),
             "metadata": {"source": fake.url(), "timestamp": fake.iso8601()},
         },
-        "raw_error_trace": f'Error in module {fake.file_path()}:\nTraceback (most recent call last):\n  File "{fake.file_name()}", line {fake.random_int(1, 500)}, in {fake.word()}\n{fake.sentence()}',
+        "raw_error_trace": error_trace,
         "action_timestamp": fake.iso8601(),
     }
 

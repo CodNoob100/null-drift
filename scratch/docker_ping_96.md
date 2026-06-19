@@ -1,1 +1,0 @@
-Hi @vaishnavidesai09, just a quick heads up: we've updated the Dockerfiles to fix a local startup issue. Please make sure to pull the latest `main` branch before testing your code locally with `docker compose`!

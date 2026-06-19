@@ -62,3 +62,4 @@ test_final.py
 download_model.py
 *.log
 .fastembed_cache/
+scratch/

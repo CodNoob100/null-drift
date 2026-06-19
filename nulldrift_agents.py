@@ -23,6 +23,7 @@ class NullDriftCrewStorage(StorageBackend):
         self.gateway_url = gateway_url.rstrip("/")
         self.thread_id = thread_id
         self.embedding_function = embedding_function
+        self.client = httpx.Client(timeout=5.0)
 
     def save(self, payload: Dict[str, Any]) -> None:
         """Injects the payload into the continuous state."""
@@ -40,30 +41,26 @@ class NullDriftCrewStorage(StorageBackend):
                 return
 
         try:
-            with httpx.Client() as client:
-                res = client.post(
-                    f"{self.gateway_url}/inject",
-                    params={"thread_id": self.thread_id},
-                    json=data,
-                    timeout=5.0,
-                )
-                res.raise_for_status()
+            res = self.client.post(
+                f"{self.gateway_url}/inject",
+                params={"thread_id": self.thread_id},
+                json=data,
+            )
+            res.raise_for_status()
         except Exception as e:
             logging.error(f"Failed to save to null-drift: {e}")
 
     def search(self, query: str) -> List[Dict[str, Any]]:
         """Recalls the dominant state."""
         try:
-            with httpx.Client() as client:
-                res = client.get(
-                    f"{self.gateway_url}/recall",
-                    params={"thread_id": self.thread_id},
-                    timeout=5.0,
-                )
-                res.raise_for_status()
-                data = res.json()
-                if data.get("recovered_text"):
-                    return [json.loads(data["recovered_text"])]
+            res = self.client.get(
+                f"{self.gateway_url}/recall",
+                params={"thread_id": self.thread_id},
+            )
+            res.raise_for_status()
+            data = res.json()
+            if data.get("recovered_text"):
+                return [json.loads(data["recovered_text"])]
         except Exception as e:
             logging.error(f"Failed to search null-drift: {e}")
         return []
@@ -71,24 +68,20 @@ class NullDriftCrewStorage(StorageBackend):
     def take_snapshot(self) -> None:
         """Forces the daemon to flush this specific thread's state to disk."""
         try:
-            with httpx.Client() as client:
-                client.post(
-                    f"{self.gateway_url}/snapshot",
-                    params={"thread_id": self.thread_id},
-                    timeout=5.0,
-                )
+            self.client.post(
+                f"{self.gateway_url}/snapshot",
+                params={"thread_id": self.thread_id},
+            )
         except Exception as e:
             logging.error(f"Failed to take snapshot: {e}")
 
     def restore_from_snapshot(self) -> None:
         """Loads this specific thread's state from disk, overwriting the Moka cache."""
         try:
-            with httpx.Client() as client:
-                client.post(
-                    f"{self.gateway_url}/restore",
-                    params={"thread_id": self.thread_id},
-                    timeout=5.0,
-                )
+            self.client.post(
+                f"{self.gateway_url}/restore",
+                params={"thread_id": self.thread_id},
+            )
         except Exception as e:
             logging.error(f"Failed to restore snapshot: {e}")
 
@@ -102,6 +95,12 @@ class NullDriftLangGraphStore(BaseStore):
         self.gateway_url = gateway_url.rstrip("/")
         self.embedding_function = embedding_function
         self.client = httpx.AsyncClient(timeout=5.0)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.client.aclose()
 
     async def aput(
         self, namespace: tuple[str, ...], key: str, value: dict[str, Any]

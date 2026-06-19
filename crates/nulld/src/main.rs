@@ -49,6 +49,7 @@ struct ThreadState {
 struct GlobalState {
     projectors: RwLock<HashMap<usize, Arc<Projector>>>,
     threads: Cache<String, Arc<RwLock<ThreadState>>>,
+    cleanup_threshold: usize,
 }
 
 type SharedState = Arc<GlobalState>;
@@ -122,9 +123,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut projectors = HashMap::new();
     projectors.insert(384, Arc::new(Projector::new(384, 10000)));
 
+    let cleanup_threshold = std::env::var("CLEANUP_THRESHOLD")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(3000);
+
     let global_state = GlobalState {
         projectors: RwLock::new(projectors),
         threads: cache,
+        cleanup_threshold,
     };
 
     let state = Arc::new(global_state);
@@ -169,7 +176,7 @@ async fn get_or_load_thread(
     }
 
     let new_ts = ThreadState {
-        amn: AttractorIndex::new(3000),
+        amn: AttractorIndex::new(state.cleanup_threshold),
         hrsa: Hrsa::new(10000),
     };
     let ts = Arc::new(RwLock::new(new_ts));

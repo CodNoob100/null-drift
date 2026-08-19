@@ -137,6 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(global_state);
 
     let app = Router::new()
+        .route("/health", get(handle_health))
         .route("/inject", post(handle_inject))
         .route("/recall", get(handle_recall))
         .route("/snapshot", post(handle_snapshot))
@@ -152,6 +153,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+async fn handle_health() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        Json(SimpleResponse {
+            status: "ok".to_string(),
+        }),
+    )
 }
 
 async fn get_or_load_thread(

@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 axum = "0.8"
 tokio = { version = "1.36.0", features = ["full"] }
-fastembed = "5.16.1"
+fastembed = "6.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.12", features = ["json"] }

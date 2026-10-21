@@ -501,8 +501,10 @@ mod tests {
             amn: AttractorIndex::new(3000),
             hrsa: Hrsa::new(4),
         };
-        state.amn.store(Array1::from_vec(vec![1.0, -1.0, 1.0, -1.0]),
-            "existing".to_string());
+        state.amn.store(
+            Array1::from_vec(vec![1.0, -1.0, 1.0, -1.0]),
+            "existing".to_string(),
+        );
         state.hrsa.step = 9;
         assert!(validate_attractor_capacity(state.amn.attractors.len(), 0.95, 1).is_err());
         assert_eq!(state.amn.attractors.len(), 1);
@@ -601,6 +603,7 @@ mod tests {
             projectors: RwLock::new(HashMap::new()),
             threads: Cache::new(64),
             cleanup_threshold: 3000,
+            max_attractors_per_thread: 64,
         });
         let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
         let thread_id = format!("coalesce_{}_{}", std::process::id(), id);
@@ -637,6 +640,7 @@ mod tests {
             projectors: RwLock::new(HashMap::new()),
             threads: Cache::new(64),
             cleanup_threshold: 3000,
+            max_attractors_per_thread: 64,
         });
         let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
         let a = format!("thread_a_{}_{}", std::process::id(), id);

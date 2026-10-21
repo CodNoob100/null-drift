@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security / compatibility (proposed)
+
+- Reject new high-salience anchors after a thread reaches a default quota of 64 (`MAX_ATTRACTORS_PER_THREAD` can set a positive override), returning HTTP 507 without advancing HRSA or discarding stored memories. Continue to accept lower-salience updates. Existing over-quota snapshots stay loadable; this changes high-salience write behavior and needs deployment review.
+
 ### Fixed
 
 - Refuse to silently initialize an empty thread when a persisted checkpoint exists but is corrupt or unreadable. Only a missing snapshot creates a new state; return an explicit error and preserve the existing bytes. Add valid/corrupt/missing checkpoint regression tests.

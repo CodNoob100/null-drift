@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Coalesce concurrent first access or disk hydration of the same thread through the Moka async cache initializer. All requests now share one cached `ThreadState`, preventing a race that could lose accepted events. Add concurrent-start regression tests without changing snapshot serialization or the HTTP API.
+
+### Fixed
+
 - Persist manual and idle-eviction checkpoints through uniquely named, exclusive-create temporary files, sync bytes and rename within the snapshot directory; keep an existing checkpoint intact if writing a replacement fails. This is not a full power-loss durability guarantee because directory sync is not performed.
 
 ### Security

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Persist manual and idle-eviction checkpoints through uniquely named, exclusive-create temporary files, sync bytes and rename within the snapshot directory; keep an existing checkpoint intact if writing a replacement fails. This is not a full power-loss durability guarantee because directory sync is not performed.
+
 ### Security
 
 - Bound daemon projection-matrix allocations to 64 million total `f32` entries (256 MB matrix storage); reject new embedding dimensions above 4096 or when the shared matrix budget is exhausted, and validate thread IDs before projector construction. Include budget and overflow regression tests.

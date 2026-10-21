@@ -10,6 +10,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 #[derive(Clone)]
 struct AppState {
@@ -49,6 +50,11 @@ struct DaemonPayload {
     salience: f32,
 }
 
+#[derive(Serialize)]
+struct HealthResponse {
+    status: &'static str,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let num_models = std::thread::available_parallelism()
@@ -74,6 +80,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let app = Router::new()
+        .route("/health", get(health_state))
         .route("/inject", post(inject_memory))
         .route("/recall", get(recall_state))
         .route("/snapshot", post(snapshot_state))
@@ -88,6 +95,31 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+async fn health_state(State(state): State<AppState>) -> (StatusCode, Json<HealthResponse>) {
+    let url = format!("{}/health", state.nulld_url);
+    let ready = match state
+        .client
+        .get(url)
+        .timeout(Duration::from_secs(2))
+        .send()
+        .await
+    {
+        Ok(response) => response.status().is_success(),
+        Err(_) => false,
+    };
+
+    if ready {
+        (StatusCode::OK, Json(HealthResponse { status: "ok" }))
+    } else {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(HealthResponse {
+                status: "unavailable",
+            }),
+        )
+    }
 }
 
 fn build_json_response(status: reqwest::StatusCode, body: String) -> Response {

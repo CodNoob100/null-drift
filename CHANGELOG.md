@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- A gateway `/health` readiness endpoint that checks the daemon, with integration-test readiness checks that require HTTP success rather than merely an open socket.
+
 ### Fixed
 
 - Reconstruct historical HRSA state using a single modulo-based cyclic offset rather than one full 10,000D permutation per requested historical step. Add equivalence and extreme-step regression tests.

@@ -7,7 +7,7 @@ from nulldrift_agents import NullDriftCrewStorage, NullDriftLangGraphStore
 
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://127.0.0.1:8000")
 
-# Wait for gateway to fully boot (Sentence Transformers takes ~10s to load)
+# Wait for gateway to initialize its embedding model and connect to nulld
 
 
 @pytest.fixture(scope="session")
@@ -16,9 +16,10 @@ def gateway_ready():
 
     for _ in range(30):
         try:
-            httpx.get(f"{GATEWAY_URL}/")
+            response = httpx.get(f"{GATEWAY_URL}/health", timeout=2.0)
+            response.raise_for_status()
             return
-        except httpx.ConnectError:
+        except httpx.HTTPError:
             time.sleep(1)
 
     pytest.fail("Gateway failed to boot in time")

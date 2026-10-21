@@ -246,6 +246,32 @@ async fn handle_health() -> impl IntoResponse {
     )
 }
 
+/// Load a checkpoint or initialize only if no checkpoint exists.
+/// Invalid and unreadable existing files must never become blank threads.
+async fn load_thread_from_path(
+    path: &Path,
+    cleanup_threshold: usize,
+) -> std::io::Result<Arc<RwLock<ThreadState>>> {
+    match fs::read(path).await {
+        Ok(bytes) => {
+            let data = postcard::from_bytes::<ThreadState>(&bytes).map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Cannot decode existing thread snapshot: {error}"),
+                )
+            })?;
+            Ok(Arc::new(RwLock::new(data)))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok(Arc::new(RwLock::new(ThreadState {
+                amn: AttractorIndex::new(cleanup_threshold),
+                hrsa: Hrsa::new(HYPERVECTOR_DIM),
+            })))
+        }
+        Err(error) => Err(error),
+    }
+}
+
 async fn get_or_load_thread(
     state: &SharedState,
     thread_id: &str,
@@ -260,17 +286,7 @@ async fn get_or_load_thread(
     state
         .threads
         .try_get_with(thread_id.to_string(), async move {
-            if fs::metadata(&file_path).await.is_ok() {
-                let bytes = fs::read(&file_path).await?;
-                if let Ok(ts_data) = postcard::from_bytes::<ThreadState>(&bytes) {
-                    return Ok(Arc::new(RwLock::new(ts_data)));
-                }
-            }
-
-            Ok::<_, std::io::Error>(Arc::new(RwLock::new(ThreadState {
-                amn: AttractorIndex::new(cleanup_threshold),
-                hrsa: Hrsa::new(HYPERVECTOR_DIM),
-            })))
+            load_thread_from_path(Path::new(&file_path), cleanup_threshold).await
         })
         .await
         .map_err(|err| DaemonError::ThreadInitialization(err.to_string()))
@@ -424,7 +440,7 @@ async fn handle_restore(
 mod tests {
     use super::{
         GlobalState, SharedState, ThreadState, cleanup_current_state, get_or_load_thread,
-        persist_snapshot, projector_budget_allows, validate_thread_id,
+        load_thread_from_path, persist_snapshot, projector_budget_allows, validate_thread_id,
     };
     use moka::future::Cache;
     use ndarray::Array1;
@@ -433,6 +449,60 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
     use tokio::sync::{Barrier, RwLock};
+
+    #[tokio::test]
+    async fn damaged_checkpoint_does_not_create_empty_state() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "nulld_corrupt_snapshot_{}_{}.nd",
+            std::process::id(),
+            id
+        ));
+        tokio::fs::write(&path, b"").await.unwrap();
+
+        let error = match load_thread_from_path(&path, 3000).await {
+            Ok(_) => panic!("corrupt checkpoint was silently replaced"),
+            Err(error) => error,
+        };
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), b"");
+        tokio::fs::remove_file(path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn valid_checkpoint_is_loaded_without_reset() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "nulld_valid_snapshot_{}_{}.nd",
+            std::process::id(),
+            id
+        ));
+        let mut state = ThreadState {
+            amn: AttractorIndex::new(3000),
+            hrsa: Hrsa::new(4),
+        };
+        state.hrsa.step = 17;
+        let bytes = postcard::to_stdvec(&state).unwrap();
+        tokio::fs::write(&path, bytes).await.unwrap();
+        let loaded = load_thread_from_path(&path, 3000).await.unwrap();
+        assert_eq!(loaded.read().await.hrsa.step, 17);
+        tokio::fs::remove_file(path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn missing_checkpoint_creates_fresh_state() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "nulld_absent_snapshot_{}_{}.nd",
+            std::process::id(),
+            id
+        ));
+        assert!(!path.exists());
+        let loaded = load_thread_from_path(&path, 3000).await.unwrap();
+        assert_eq!(loaded.read().await.hrsa.step, 0);
+        assert_eq!(loaded.read().await.hrsa.active_state.len(), 10_000);
+        assert!(!path.exists());
+    }
 
     #[test]
     fn current_recall_rejects_unrelated_and_truncated_anchors() {

@@ -9,23 +9,44 @@ First off, thank you for considering contributing to `null-drift`! It's people l
 
 If you are new to the project, the best place to start is by looking at the **Good First Issues** label on our GitHub repository. These issues are specifically curated to be isolated, require zero knowledge of the deep mathematical phase space architecture, and focus heavily on improving the Developer Experience (DX).
 
-### Local Development Setup
+### Development setup
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/CodNoob100/null-drift.git
-   cd null-drift
-   ```
-2. **Run the Rust Daemon:**
-   ```bash
-   cargo run --bin nulld
-   ```
-3. **Run the Python Gateway:**
-   ```bash
-   cd gateway
-   pip install -r requirements.txt
-   python main.py
-   ```
+The gateway and daemon are **both Rust services**. You can use Docker Compose for a quick check, or run the two Rust binaries in separate terminals.
+
+**Option A — Docker Compose** (from the repository root):
+
+```bash
+docker compose -f docker/docker-compose.yml up --build -d
+curl -fsS http://127.0.0.1:8000/health
+```
+
+The gateway listens on `127.0.0.1:8000` through the provided Compose file. Its `/health` endpoint returns HTTP 503 until the daemon is reachable. The first start may download the embedding model.
+
+**Option B — Rust workspace** (Rust toolchain required):
+
+```bash
+git clone https://github.com/CodNoob100/null-drift.git
+cd null-drift
+cargo run -p nulld
+```
+
+In a separate terminal in the same checkout:
+
+```bash
+NULLD_URL=http://127.0.0.1:3000 cargo run -p gateway-rs
+```
+
+Check `curl -fsS http://127.0.0.1:8000/health` once the model has initialized. Never expose either service to untrusted networks without external authentication and authorization; thread IDs are **not** access credentials.
+
+For small Rust changes, run the same commands that the main compliance workflow checks:
+
+```bash
+cargo fmt --check
+cargo clippy --workspace --lib --bins -- -D warnings
+cargo test --workspace --lib --bins
+```
+
+Python client adapters are in `nulldrift_agents.py`. They are prototypes, not guaranteed drop-in CrewAI or LangGraph implementations. Python formatting is checked using `black --check .` and `flake8 . --max-line-length=120`. See [README.md](README.md) for the supported API and current limitations.
 
 ## 💡 Submitting Feature Requests & Bug Reports
 
@@ -55,8 +76,8 @@ To maintain high engineering standards, our CI pipeline strictly enforces the fo
    - **Python:** Code must pass `black --check` and `flake8` for style compliance.
 4. **Dependency Auditing:** 
    - `cargo tree --duplicates` reports transitive dependency duplication as a non-blocking warning; duplicates in upstream dependency graphs are not automatically considered actionable bugs.
-   - All dependencies are audited for known CVEs via `cargo-audit` and `osv-scanner`.
-5. **No Secret Leaks:** Hardcoded secrets and credentials are automatically flagged and blocked by `gitleaks`.
+   - Security scanners such as `cargo-audit` and `osv-scanner` run **non-blocking**; they produce advisory results and do not guarantee zero vulnerabilities.
+5. **No Secret Leaks:** Never commit secrets or credentials. The current Gitleaks scanner runs in an **advisory** workflow and is not a substitute for review.
 6. **Branch Protection:** The `main` branch is protected by GitHub rules and required status checks. Use Pull Requests for changes to `main`; merge commits, squash merges, and rebases must all be valid. Commit message conventions are not evidence of whether a change came through a PR. Check the active GitHub branch protection settings for bypass privileges and required reviews.
 
 ## 🤝 Adding SDK Integrations
@@ -88,7 +109,7 @@ When submitting a Pull Request, please ensure you update the `CHANGELOG.md` file
 
 We utilize several automated bots to maintain repository health:
 - **Dependabot:** Automatically updates `cargo` dependencies and GitHub Actions.
-- **Compliance Bots:** Enforces `cargo fmt`, zero-warnings `cargo clippy`, and blocks direct pushes to `main`.
-- **Security Scanners:** Runs `cargo-audit` and `gitleaks` to ensure no vulnerable dependencies or leaked secrets enter the codebase.
+- **Compliance Bots:** Enforces Rust formatting, Clippy, unit tests, Python formatting/linting and repository-specific rules. GitHub branch protection (not CI log text) controls whether direct pushes can be rejected.
+- **Security Scanners:** Runs advisory checks (including `cargo-audit`, OSV and Gitleaks). Review the findings: scanner success does not prove there are no vulnerabilities or secrets.
 
 By submitting a Pull Request, you agree that your contributions will be licensed under the project's AGPL-3.0 License.

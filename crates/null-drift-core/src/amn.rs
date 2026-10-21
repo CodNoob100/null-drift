@@ -40,5 +40,32 @@ impl AttractorIndex {
 }
 
 pub fn hamming_distance(a: &Array1<f32>, b: &Array1<f32>) -> usize {
-    a.iter().zip(b.iter()).filter(|(x, y)| x != y).count()
+    // zip compares only the common prefix. Count unmatched dimensions too.
+    a.iter().zip(b.iter()).filter(|(x, y)| x != y).count() + a.len().abs_diff(b.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AttractorIndex, hamming_distance};
+    use ndarray::Array1;
+
+    #[test]
+    fn distance_counts_unpaired_dimensions() {
+        let short = Array1::from_vec(vec![1.0, -1.0]);
+        let long = Array1::from_vec(vec![1.0, -1.0, 1.0, -1.0]);
+        assert_eq!(hamming_distance(&short, &long), 2);
+        assert_eq!(hamming_distance(&long, &short), 2);
+        assert_eq!(hamming_distance(&Array1::zeros(0), &long), 4);
+    }
+
+    #[test]
+    fn cleanup_rejects_truncated_false_matches() {
+        let mut index = AttractorIndex::new(0);
+        index.store(Array1::from_vec(vec![1.0, -1.0]), "short".to_string());
+        assert_eq!(index.cleanup(&Array1::from_vec(vec![1.0, -1.0, 1.0])), None);
+        assert_eq!(
+            index.cleanup(&Array1::from_vec(vec![1.0, -1.0])),
+            Some("short".to_string())
+        );
+    }
 }

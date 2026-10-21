@@ -31,10 +31,10 @@ The system is decoupled to support massively parallel multi-agent ecosystems whi
 Spin up the entire decoupled architecture with a single command:
 
 ```bash
-docker compose up --build -d
+docker compose -f docker/docker-compose.yml up --build -d
 ```
 
-This deploys the `nulld` backend and exposes the `gateway` on `http://localhost:8000` for public consumption.
+This deploys the `nulld` backend and publishes the `gateway` on `http://127.0.0.1:8000` for local access. Check `GET /health` on the gateway for readiness: HTTP 200 means the embedding gateway and daemon are available; HTTP 503 means the daemon is unavailable.
 
 ## API Usage (Multi-Tenant)
 

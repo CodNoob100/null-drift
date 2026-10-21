@@ -28,12 +28,18 @@ pub enum DaemonError {
     IoError(#[from] std::io::Error),
     #[error("Invalid embedding dimension")]
     InvalidDimension,
+    #[error(
+        "Invalid thread ID: expected 1–128 ASCII letters, digits, '-', '_' or '.' without '..'"
+    )]
+    InvalidThreadId,
 }
 
 impl IntoResponse for DaemonError {
     fn into_response(self) -> axum::response::Response {
         let (status, err_msg) = match self {
-            DaemonError::InvalidDimension => (StatusCode::BAD_REQUEST, self.to_string()),
+            DaemonError::InvalidDimension | DaemonError::InvalidThreadId => {
+                (StatusCode::BAD_REQUEST, self.to_string())
+            }
             _ => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
         (status, Json(SimpleResponse { status: err_msg })).into_response()
@@ -62,6 +68,21 @@ struct ThreadQuery {
 
 fn default_thread_id() -> String {
     "default".to_string()
+}
+
+fn validate_thread_id(thread_id: &str) -> Result<(), DaemonError> {
+    if thread_id.is_empty()
+        || thread_id.len() > 128
+        || thread_id == "."
+        || thread_id.contains("..")
+        || !thread_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    {
+        return Err(DaemonError::InvalidThreadId);
+    }
+
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -168,6 +189,8 @@ async fn get_or_load_thread(
     state: &SharedState,
     thread_id: &str,
 ) -> Result<Arc<RwLock<ThreadState>>, DaemonError> {
+    validate_thread_id(thread_id)?;
+
     if let Some(ts) = state.threads.get(thread_id).await {
         return Ok(ts);
     }
@@ -314,6 +337,8 @@ async fn handle_restore(
     State(state): State<SharedState>,
     Query(query): Query<ThreadQuery>,
 ) -> Result<impl IntoResponse, DaemonError> {
+    validate_thread_id(&query.thread_id)?;
+
     let file_path = format!("state_{}.nd", query.thread_id);
     if fs::metadata(&file_path).await.is_ok() {
         let bytes = fs::read(&file_path).await?;
@@ -336,5 +361,47 @@ async fn handle_restore(
                 status: "state file not found".to_string(),
             }),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_thread_id;
+
+    #[test]
+    fn accepts_safe_thread_ids() {
+        for id in [
+            "default",
+            "agent_007",
+            "test_langgraph_agent1",
+            "tenant-1",
+            "agent.v2",
+        ] {
+            assert!(
+                validate_thread_id(id).is_ok(),
+                "rejected valid thread ID: {id}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_unsafe_thread_ids() {
+        for id in [
+            "",
+            ".",
+            "..",
+            "../escape",
+            "a/../b",
+            "a/b",
+            "a\\b",
+            "with space",
+            "a\nb",
+        ] {
+            assert!(
+                validate_thread_id(id).is_err(),
+                "accepted unsafe thread ID: {id:?}"
+            );
+        }
+        assert!(validate_thread_id(&"a".repeat(129)).is_err());
     }
 }

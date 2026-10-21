@@ -100,6 +100,9 @@ jobs:
             exit 1
           fi
 
+      - name: Rust Unit Tests (cargo test)
+        run: cargo test --workspace --lib --bins
+
       - name: Python Formatting Check (black)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

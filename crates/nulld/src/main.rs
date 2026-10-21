@@ -24,7 +24,7 @@ const MAX_EMBEDDING_DIM: usize = 4_096;
 const MAX_PROJECTOR_ELEMENTS: usize = 64_000_000;
 
 fn projector_budget_allows(
-    cached_dimensions: impl Iterator<Item = usize>,
+    mut cached_dimensions: impl Iterator<Item = usize>,
     requested_dimension: usize,
 ) -> bool {
     if requested_dimension == 0 || requested_dimension > MAX_EMBEDDING_DIM {

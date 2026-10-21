@@ -57,7 +57,7 @@ To maintain high engineering standards, our CI pipeline strictly enforces the fo
    - `cargo tree --duplicates` reports transitive dependency duplication as a non-blocking warning; duplicates in upstream dependency graphs are not automatically considered actionable bugs.
    - All dependencies are audited for known CVEs via `cargo-audit` and `osv-scanner`.
 5. **No Secret Leaks:** Hardcoded secrets and credentials are automatically flagged and blocked by `gitleaks`.
-6. **Branch Protection:** The `main` branch is strictly protected. Force pushing and branch deletion are globally disabled. Status checks (including all CI rules above) must pass before a Pull Request can be merged.
+6. **Branch Protection:** The `main` branch is protected by GitHub rules and required status checks. Use Pull Requests for changes to `main`; merge commits, squash merges, and rebases must all be valid. Commit message conventions are not evidence of whether a change came through a PR. Check the active GitHub branch protection settings for bypass privileges and required reviews.
 
 ## 🤝 Adding SDK Integrations
 

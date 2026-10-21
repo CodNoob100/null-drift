@@ -91,6 +91,9 @@ mod tests {
     fn very_large_recall_step_count_wraps_correctly() {
         let mut state = Hrsa::new(5);
         state.active_state = Array1::from_vec(vec![-5.0, -1.0, 0.0, 1.0, 5.0]);
-        assert_eq!(state.recall_event(usize::MAX), state.recall_event(usize::MAX % 5));
+        assert_eq!(
+            state.recall_event(usize::MAX),
+            state.recall_event(usize::MAX % 5)
+        );
     }
 }

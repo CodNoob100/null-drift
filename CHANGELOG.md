@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Refuse to silently initialize an empty thread when a persisted checkpoint exists but is corrupt or unreadable. Only a missing snapshot creates a new state; return an explicit error and preserve the existing bytes. Add valid/corrupt/missing checkpoint regression tests.
+
+### Fixed
+
 - Use the same Hamming-distance cleanup threshold and dimension-safe vector comparison for current-state recall as for historical recall. Return null for unrelated or malformed anchors rather than selecting an arbitrary nearest match or indexing past a truncated vector. Add regression tests.
 
 ### Fixed

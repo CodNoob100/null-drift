@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Use the same Hamming-distance cleanup threshold and dimension-safe vector comparison for current-state recall as for historical recall. Return null for unrelated or malformed anchors rather than selecting an arbitrary nearest match or indexing past a truncated vector. Add regression tests.
+
+### Fixed
+
 - Count unmatched dimensions in Hamming distance so a short or truncated attractor cannot appear to be an exact cleanup match. Regression tests cover unequal vector lengths and exact-match thresholds.
 
 ### Fixed

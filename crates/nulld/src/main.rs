@@ -332,6 +332,14 @@ async fn handle_inject(
     ))
 }
 
+fn cleanup_current_state(state: &ThreadState) -> Option<String> {
+    let bipolar = state
+        .hrsa
+        .active_state
+        .mapv(|value| if value >= 0.0 { 1.0 } else { -1.0 });
+    state.amn.cleanup(&bipolar)
+}
+
 async fn handle_recall(
     State(state): State<SharedState>,
     Query(query): Query<RecallQuery>,
@@ -349,27 +357,9 @@ async fn handle_recall(
             }
         }
     } else {
-        // O(1) Recall: Find the dominant attractor in the current state without looping back in time!
-        let noisy_hv: Vec<f32> = ts
-            .hrsa
-            .active_state
-            .iter()
-            .map(|&x| if x >= 0.0 { 1.0 } else { -1.0 })
-            .collect();
-        let mut local_min_hamming = usize::MAX;
-
-        for (clean_hv, concept) in &ts.amn.attractors {
-            let mut hamming = 0;
-            for i in 0..noisy_hv.len() {
-                if noisy_hv[i] != clean_hv[i] {
-                    hamming += 1;
-                }
-            }
-            if hamming < local_min_hamming {
-                local_min_hamming = hamming;
-                best_text = Some(concept.clone());
-            }
-        }
+        // Apply the same cleanup threshold and dimension-safe distance that
+        // historical recall uses; the nearest unrelated anchor is not a hit.
+        best_text = cleanup_current_state(&ts);
     }
 
     Ok((
@@ -433,13 +423,48 @@ async fn handle_restore(
 #[cfg(test)]
 mod tests {
     use super::{
-        GlobalState, SharedState, get_or_load_thread, persist_snapshot, projector_budget_allows,
-        validate_thread_id,
+        GlobalState, SharedState, ThreadState, cleanup_current_state, get_or_load_thread,
+        persist_snapshot, projector_budget_allows, validate_thread_id,
     };
     use moka::future::Cache;
+    use ndarray::Array1;
+    use null_drift_core::amn::AttractorIndex;
+    use null_drift_core::hrsa::Hrsa;
     use std::collections::HashMap;
     use std::sync::Arc;
     use tokio::sync::{Barrier, RwLock};
+
+    #[test]
+    fn current_recall_rejects_unrelated_and_truncated_anchors() {
+        let mut state = ThreadState {
+            amn: AttractorIndex::new(1),
+            hrsa: Hrsa::new(4),
+        };
+        state.hrsa.active_state = Array1::from_vec(vec![2.0, 3.0, 4.0, 5.0]);
+        state.amn.store(
+            Array1::from_vec(vec![-1.0, -1.0, -1.0, -1.0]),
+            "unrelated".to_string(),
+        );
+        state
+            .amn
+            .store(Array1::from_vec(vec![1.0, 1.0]), "short".to_string());
+        assert_eq!(cleanup_current_state(&state), None);
+
+        state.amn.store(
+            Array1::from_vec(vec![1.0, 1.0, 1.0, 1.0]),
+            "matching".to_string(),
+        );
+        assert_eq!(cleanup_current_state(&state), Some("matching".to_string()));
+    }
+
+    #[test]
+    fn current_recall_returns_none_without_attractors() {
+        let state = ThreadState {
+            amn: AttractorIndex::new(3000),
+            hrsa: Hrsa::new(4),
+        };
+        assert_eq!(cleanup_current_state(&state), None);
+    }
 
     #[tokio::test]
     async fn concurrent_first_access_shares_a_single_thread_state() {

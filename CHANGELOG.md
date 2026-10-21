@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Reconstruct historical HRSA state using a single modulo-based cyclic offset rather than one full 10,000D permutation per requested historical step. Add equivalence and extreme-step regression tests.
+
+### Fixed
+
 - Remove the post-merge commit-message check that falsely failed CI for legitimate squash merges. GitHub branch protection remains responsible for enforcing PR-only merges.
 
 ### Changed

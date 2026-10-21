@@ -445,7 +445,9 @@ mod tests {
             Array1::from_vec(vec![-1.0, -1.0, -1.0, -1.0]),
             "unrelated".to_string(),
         );
-        state.amn.store(Array1::from_vec(vec![1.0, 1.0]), "short".to_string());
+        state
+            .amn
+            .store(Array1::from_vec(vec![1.0, 1.0]), "short".to_string());
         assert_eq!(cleanup_current_state(&state), None);
 
         state.amn.store(

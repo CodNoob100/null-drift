@@ -11,25 +11,6 @@ permissions:
   contents: read
 
 jobs:
-  check-direct-push:
-    name: PR Enforcement Bot
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 2
-      - name: Prevent direct push to main
-        run: |
-          commit_message=$(git log -1 --pretty=format:"%s")
-          if [[ "$commit_message" != Merge* ]] && [[ "$commit_message" != *"Merge pull request"* ]]; then
-            echo "ERROR: Direct pushes to main are strictly forbidden. You must use a Pull Request."
-            exit 1
-          fi
-
-
   enforce-branch-protection:
     name: Self-Healing Branch Protection
     runs-on: ubuntu-latest

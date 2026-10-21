@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Update the embedding, HTTP, and projection RNG dependencies to compatible current major versions; enable reqwest query serialization explicitly and switch to FastEmbed `TextInitOptions`.
+
 ### Security
 
 - Validate daemon thread IDs before using them in persisted state filenames; reject unsafe IDs with HTTP 400 and add regression tests.

@@ -94,7 +94,9 @@ pub enum DaemonError {
     InvalidDimension,
     #[error("Projection matrix budget exhausted; reuse an existing embedding dimension")]
     ProjectorBudgetExceeded,
-    #[error("High-salience anchor capacity reached for this thread; use a new thread or increase MAX_ATTRACTORS_PER_THREAD")]
+    #[error(
+        "High-salience anchor capacity reached for this thread; use a new thread or increase MAX_ATTRACTORS_PER_THREAD"
+    )]
     AttractorCapacityExceeded,
     #[error(
         "Invalid thread ID: expected 1–128 ASCII letters, digits, '-', '_' or '.' without '..'"

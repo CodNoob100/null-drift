@@ -51,6 +51,20 @@ const HYPERVECTOR_DIM: usize = 10_000;
 const MAX_EMBEDDING_DIM: usize = 4_096;
 // 64 million f32 entries = 256 MB for all cached projection matrices combined.
 const MAX_PROJECTOR_ELEMENTS: usize = 64_000_000;
+// Fail closed once the thread has this many anchors; do not silently discard memory.
+const DEFAULT_MAX_ATTRACTORS_PER_THREAD: usize = 64;
+
+fn validate_attractor_capacity(
+    stored_anchors: usize,
+    salience: f32,
+    limit: usize,
+) -> Result<(), DaemonError> {
+    if salience >= 0.90 && stored_anchors >= limit {
+        Err(DaemonError::AttractorCapacityExceeded)
+    } else {
+        Ok(())
+    }
+}
 
 fn projector_budget_allows(
     mut cached_dimensions: impl Iterator<Item = usize>,
@@ -80,6 +94,8 @@ pub enum DaemonError {
     InvalidDimension,
     #[error("Projection matrix budget exhausted; reuse an existing embedding dimension")]
     ProjectorBudgetExceeded,
+    #[error("High-salience anchor capacity reached for this thread; use a new thread or increase MAX_ATTRACTORS_PER_THREAD")]
+    AttractorCapacityExceeded,
     #[error(
         "Invalid thread ID: expected 1–128 ASCII letters, digits, '-', '_' or '.' without '..'"
     )]
@@ -94,6 +110,9 @@ impl IntoResponse for DaemonError {
             }
             DaemonError::ProjectorBudgetExceeded => {
                 (StatusCode::SERVICE_UNAVAILABLE, self.to_string())
+            }
+            DaemonError::AttractorCapacityExceeded => {
+                (StatusCode::INSUFFICIENT_STORAGE, self.to_string())
             }
             _ => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
@@ -111,6 +130,7 @@ struct GlobalState {
     projectors: RwLock<HashMap<usize, Arc<Projector>>>,
     threads: Cache<String, Arc<RwLock<ThreadState>>>,
     cleanup_threshold: usize,
+    max_attractors_per_thread: usize,
 }
 
 type SharedState = Arc<GlobalState>;
@@ -210,10 +230,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(3000);
 
+    let max_attractors_per_thread = std::env::var("MAX_ATTRACTORS_PER_THREAD")
+        .ok()
+        .and_then(|value| value.parse::<std::num::NonZeroUsize>().ok())
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or(DEFAULT_MAX_ATTRACTORS_PER_THREAD);
+
     let global_state = GlobalState {
         projectors: RwLock::new(projectors),
         threads: cache,
         cleanup_threshold,
+        max_attractors_per_thread,
     };
 
     let state = Arc::new(global_state);
@@ -304,6 +331,16 @@ async fn handle_inject(
         return Err(DaemonError::InvalidDimension);
     }
 
+    let thread_lock = get_or_load_thread(&state, &query.thread_id).await?;
+    let mut ts = thread_lock.write().await;
+    // Reject before projection and before updating HRSA.step or active_state.
+    // The thread lock makes simultaneous capacity checks atomic.
+    validate_attractor_capacity(
+        ts.amn.attractors.len(),
+        payload.salience,
+        state.max_attractors_per_thread,
+    )?;
+
     let projector = {
         let read_guard = state.projectors.read().await;
         if let Some(p) = read_guard.get(&dim) {
@@ -324,9 +361,6 @@ async fn handle_inject(
             }))
         }
     };
-
-    let thread_lock = get_or_load_thread(&state, &query.thread_id).await?;
-    let mut ts = thread_lock.write().await;
 
     let dense_emb = Array1::from_vec(payload.embedding);
     let bipolar_event = projector.project_to_hypervector(dense_emb);
@@ -440,7 +474,8 @@ async fn handle_restore(
 mod tests {
     use super::{
         GlobalState, SharedState, ThreadState, cleanup_current_state, get_or_load_thread,
-        load_thread_from_path, persist_snapshot, projector_budget_allows, validate_thread_id,
+        load_thread_from_path, persist_snapshot, projector_budget_allows,
+        validate_attractor_capacity, validate_thread_id,
     };
     use moka::future::Cache;
     use ndarray::Array1;
@@ -449,6 +484,30 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
     use tokio::sync::{Barrier, RwLock};
+
+    #[test]
+    fn anchor_quota_rejects_only_high_salience_over_capacity() {
+        assert!(validate_attractor_capacity(0, 0.90, 64).is_ok());
+        assert!(validate_attractor_capacity(63, 1.0, 64).is_ok());
+        assert!(validate_attractor_capacity(64, 0.90, 64).is_err());
+        assert!(validate_attractor_capacity(100, 1.0, 64).is_err());
+        assert!(validate_attractor_capacity(64, 0.89, 64).is_ok());
+        assert!(validate_attractor_capacity(100, 0.1, 64).is_ok());
+    }
+
+    #[test]
+    fn failed_anchor_quota_check_does_not_mutate_existing_state() {
+        let mut state = ThreadState {
+            amn: AttractorIndex::new(3000),
+            hrsa: Hrsa::new(4),
+        };
+        state.amn.store(Array1::from_vec(vec![1.0, -1.0, 1.0, -1.0]),
+            "existing".to_string());
+        state.hrsa.step = 9;
+        assert!(validate_attractor_capacity(state.amn.attractors.len(), 0.95, 1).is_err());
+        assert_eq!(state.amn.attractors.len(), 1);
+        assert_eq!(state.hrsa.step, 9);
+    }
 
     #[tokio::test]
     async fn damaged_checkpoint_does_not_create_empty_state() {

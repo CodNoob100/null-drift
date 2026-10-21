@@ -68,20 +68,22 @@ class NullDriftCrewStorage(StorageBackend):
     def take_snapshot(self) -> None:
         """Forces the daemon to flush this specific thread's state to disk."""
         try:
-            self.client.post(
+            res = self.client.post(
                 f"{self.gateway_url}/snapshot",
                 params={"thread_id": self.thread_id},
             )
+            res.raise_for_status()
         except Exception as e:
             logging.error(f"Failed to take snapshot: {e}")
 
     def restore_from_snapshot(self) -> None:
         """Loads this specific thread's state from disk, overwriting the Moka cache."""
         try:
-            self.client.post(
+            res = self.client.post(
                 f"{self.gateway_url}/restore",
                 params={"thread_id": self.thread_id},
             )
+            res.raise_for_status()
         except Exception as e:
             logging.error(f"Failed to restore snapshot: {e}")
 

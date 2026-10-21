@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Count unmatched dimensions in Hamming distance so a short or truncated attractor cannot appear to be an exact cleanup match. Regression tests cover unequal vector lengths and exact-match thresholds.
+
+### Fixed
+
 - Coalesce concurrent first access or disk hydration of the same thread through the Moka async cache initializer. All requests now share one cached `ThreadState`, preventing a race that could lose accepted events. Add concurrent-start regression tests without changing snapshot serialization or the HTTP API.
 
 ### Fixed

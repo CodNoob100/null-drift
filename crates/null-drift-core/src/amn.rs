@@ -64,6 +64,9 @@ mod tests {
         let mut index = AttractorIndex::new(0);
         index.store(Array1::from_vec(vec![1.0, -1.0]), "short".to_string());
         assert_eq!(index.cleanup(&Array1::from_vec(vec![1.0, -1.0, 1.0])), None);
-        assert_eq!(index.cleanup(&Array1::from_vec(vec![1.0, -1.0])), Some("short".to_string()));
+        assert_eq!(
+            index.cleanup(&Array1::from_vec(vec![1.0, -1.0])),
+            Some("short".to_string())
+        );
     }
 }

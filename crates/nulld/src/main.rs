@@ -27,11 +27,7 @@ static NEXT_SNAPSHOT_ID: AtomicU64 = AtomicU64::new(0);
 /// This prevents short writes from truncating the previously valid snapshot.
 async fn persist_snapshot(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let number = NEXT_SNAPSHOT_ID.fetch_add(1, Ordering::Relaxed);
-    let temp_path = path.with_extension(format!(
-        "nd.{}.{}.tmp",
-        std::process::id(),
-        number
-    ));
+    let temp_path = path.with_extension(format!("nd.{}.{}.tmp", std::process::id(), number));
 
     let result = async {
         let mut file = fs::OpenOptions::new()
@@ -429,11 +425,13 @@ mod tests {
     #[tokio::test]
     async fn invalid_snapshot_destination_does_not_create_target_file() {
         let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "nulld_missing_directory_{}_{}",
-            std::process::id(),
-            id
-        )).join("state.nd");
+        let path = std::env::temp_dir()
+            .join(format!(
+                "nulld_missing_directory_{}_{}",
+                std::process::id(),
+                id
+            ))
+            .join("state.nd");
         assert!(persist_snapshot(&path, b"invalid").await.is_err());
         assert!(!path.exists());
     }

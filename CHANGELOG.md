@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Persist manual and idle-eviction checkpoints through uniquely named, exclusive-create temporary files, sync bytes and rename within the snapshot directory; keep an existing checkpoint intact if writing a replacement fails. This is not a full power-loss durability guarantee because directory sync is not performed.
+
 ## [0.3.0] - 2026-10-21
 
 ### Added

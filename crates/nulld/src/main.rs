@@ -13,10 +13,39 @@ use null_drift_core::hrsa::Hrsa;
 use null_drift_core::spl::Projector;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::fs;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
+
+static NEXT_SNAPSHOT_ID: AtomicU64 = AtomicU64::new(0);
+
+/// Write beside the previous checkpoint and rename only after writing all bytes.
+async fn persist_snapshot(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let number = NEXT_SNAPSHOT_ID.fetch_add(1, Ordering::Relaxed);
+    let temp_path = path.with_extension(format!("nd.{}.{}.tmp", std::process::id(), number));
+
+    let result = async {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .await?;
+        file.write_all(bytes).await?;
+        file.sync_all().await?;
+        drop(file);
+        fs::rename(&temp_path, path).await
+    }
+    .await;
+
+    if result.is_err() {
+        let _ = fs::remove_file(&temp_path).await;
+    }
+    result
+}
 
 const HYPERVECTOR_DIM: usize = 10_000;
 const MAX_EMBEDDING_DIM: usize = 4_096;
@@ -150,11 +179,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::spawn(async move {
             let ts = value.read().await;
             if let Ok(bytes) = postcard::to_stdvec(&*ts) {
-                let _ = tokio::fs::write(format!("state_{}.nd", thread_id), bytes).await;
-                println!(
-                    "Disk Paging: Saved {} to disk due to inactivity.",
-                    thread_id
-                );
+                let path = format!("state_{}.nd", thread_id);
+                match persist_snapshot(Path::new(&path), &bytes).await {
+                    Ok(()) => println!(
+                        "Disk Paging: Saved {} to disk due to inactivity.",
+                        thread_id
+                    ),
+                    Err(error) => eprintln!(
+                        "Disk Paging: Failed to save {} due to: {}",
+                        thread_id, error
+                    ),
+                }
             }
         });
     };
@@ -356,7 +391,8 @@ async fn handle_snapshot(
     let ts = thread_lock.read().await;
 
     let bytes = postcard::to_stdvec(&*ts)?;
-    fs::write(format!("state_{}.nd", query.thread_id), &bytes).await?;
+    let path = format!("state_{}.nd", query.thread_id);
+    persist_snapshot(Path::new(&path), &bytes).await?;
 
     Ok((
         StatusCode::OK,
@@ -399,7 +435,38 @@ async fn handle_restore(
 
 #[cfg(test)]
 mod tests {
-    use super::{projector_budget_allows, validate_thread_id};
+    use super::{persist_snapshot, projector_budget_allows, validate_thread_id};
+
+    #[tokio::test]
+    async fn checkpoint_replace_is_complete_and_atomic() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "nulld_snapshot_test_{}_{}.nd",
+            std::process::id(),
+            id
+        ));
+        let old = b"previous-complete-checkpoint";
+        let new = b"replacement-complete-checkpoint";
+        persist_snapshot(&path, old).await.unwrap();
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), old);
+        persist_snapshot(&path, new).await.unwrap();
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), new);
+        tokio::fs::remove_file(&path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn invalid_snapshot_destination_does_not_create_target_file() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir()
+            .join(format!(
+                "nulld_missing_directory_{}_{}",
+                std::process::id(),
+                id
+            ))
+            .join("state.nd");
+        assert!(persist_snapshot(&path, b"invalid").await.is_err());
+        assert!(!path.exists());
+    }
 
     #[test]
     fn projector_budget_accepts_normal_embedding_dimensions() {

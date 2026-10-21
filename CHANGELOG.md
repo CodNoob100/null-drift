@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Treat any unmatched elements as Hamming-distance mismatches when comparing different-sized hypervectors, so a truncated anchor cannot appear to be an exact match. Add cleanup and distance regression tests.
+
+### Fixed
+
 - Persist manual and idle-eviction checkpoints through uniquely named, exclusive-create temporary files, sync bytes and rename within the snapshot directory; keep an existing checkpoint intact if writing a replacement fails. This is not a full power-loss durability guarantee because directory sync is not performed.
 
 ### Security

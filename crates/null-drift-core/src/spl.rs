@@ -31,3 +31,30 @@ impl Projector {
         projected.mapv(|x| if x >= 0.0 { 1.0 } else { -1.0 })
     }
 }
+
+#[cfg(test)]
+mod compatibility_tests {
+    use super::Projector;
+    use rand_distr05::{
+        Distribution as LegacyDistribution, StandardNormal as LegacyStandardNormal,
+    };
+    use rand_pcg09::Pcg64 as LegacyPcg64;
+
+    #[test]
+    fn seeded_projection_matches_previous_rng_versions() {
+        let projector = Projector::new(3, 8);
+        let mut legacy_rng = <LegacyPcg64 as rand09::SeedableRng>::seed_from_u64(42);
+        let scale = 1.0 / (3.0_f32).sqrt();
+
+        for i in 0..3 {
+            for j in 0..8 {
+                let value: f32 = LegacyStandardNormal.sample(&mut legacy_rng);
+                assert_eq!(
+                    projector.w_proj[[i, j]],
+                    value * scale,
+                    "seeded projector drifted at [{i}, {j}]"
+                );
+            }
+        }
+    }
+}

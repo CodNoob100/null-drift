@@ -5,7 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use fastembed::{InitOptions, TextEmbedding};
+use fastembed::{TextEmbedding, TextInitOptions};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut models = Vec::new();
     for _ in 0..num_models {
-        models.push(Mutex::new(TextEmbedding::try_new(InitOptions::new(
+        models.push(Mutex::new(TextEmbedding::try_new(TextInitOptions::new(
             fastembed::EmbeddingModel::AllMiniLML6V2,
         ))?));
     }

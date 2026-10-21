@@ -74,6 +74,8 @@ pub enum DaemonError {
     PostcardError(#[from] postcard::Error),
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
+    #[error("Thread initialization failed: {0}")]
+    ThreadInitialization(String),
     #[error("Invalid embedding dimension (expected 1 to 4096 floats)")]
     InvalidDimension,
     #[error("Projection matrix budget exhausted; reuse an existing embedding dimension")]
@@ -250,33 +252,28 @@ async fn get_or_load_thread(
 ) -> Result<Arc<RwLock<ThreadState>>, DaemonError> {
     validate_thread_id(thread_id)?;
 
-    if let Some(ts) = state.threads.get(thread_id).await {
-        return Ok(ts);
-    }
-
+    // Only one future may hydrate or create a missing thread for each key.
+    // Previously concurrent misses could each create a different ThreadState
+    // and overwrite each other in the cache, losing accepted events.
     let file_path = format!("state_{}.nd", thread_id);
-    if fs::metadata(&file_path).await.is_ok() {
-        let bytes = fs::read(&file_path).await?;
-        if let Ok(ts_data) = postcard::from_bytes::<ThreadState>(&bytes) {
-            let ts = Arc::new(RwLock::new(ts_data));
-            state
-                .threads
-                .insert(thread_id.to_string(), ts.clone())
-                .await;
-            return Ok(ts);
-        }
-    }
-
-    let new_ts = ThreadState {
-        amn: AttractorIndex::new(state.cleanup_threshold),
-        hrsa: Hrsa::new(HYPERVECTOR_DIM),
-    };
-    let ts = Arc::new(RwLock::new(new_ts));
+    let cleanup_threshold = state.cleanup_threshold;
     state
         .threads
-        .insert(thread_id.to_string(), ts.clone())
-        .await;
-    Ok(ts)
+        .try_get_with(thread_id.to_string(), async move {
+            if fs::metadata(&file_path).await.is_ok() {
+                let bytes = fs::read(&file_path).await?;
+                if let Ok(ts_data) = postcard::from_bytes::<ThreadState>(&bytes) {
+                    return Ok(Arc::new(RwLock::new(ts_data)));
+                }
+            }
+
+            Ok::<_, std::io::Error>(Arc::new(RwLock::new(ThreadState {
+                amn: AttractorIndex::new(cleanup_threshold),
+                hrsa: Hrsa::new(HYPERVECTOR_DIM),
+            })))
+        })
+        .await
+        .map_err(|err| DaemonError::ThreadInitialization(err.to_string()))
 }
 
 async fn handle_inject(
@@ -435,7 +432,65 @@ async fn handle_restore(
 
 #[cfg(test)]
 mod tests {
-    use super::{persist_snapshot, projector_budget_allows, validate_thread_id};
+    use super::{
+        GlobalState, SharedState, get_or_load_thread, persist_snapshot, projector_budget_allows,
+        validate_thread_id,
+    };
+    use moka::future::Cache;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use tokio::sync::{Barrier, RwLock};
+
+    #[tokio::test]
+    async fn concurrent_first_access_shares_a_single_thread_state() {
+        let state: SharedState = Arc::new(GlobalState {
+            projectors: RwLock::new(HashMap::new()),
+            threads: Cache::new(64),
+            cleanup_threshold: 3000,
+        });
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let thread_id = format!("coalesce_{}_{}", std::process::id(), id);
+        let count = 24;
+        let barrier = Arc::new(Barrier::new(count + 1));
+        let mut requests = Vec::new();
+
+        for _ in 0..count {
+            let state = Arc::clone(&state);
+            let barrier = Arc::clone(&barrier);
+            let thread_id = thread_id.clone();
+            requests.push(tokio::spawn(async move {
+                barrier.wait().await;
+                get_or_load_thread(&state, &thread_id).await.unwrap()
+            }));
+        }
+
+        barrier.wait().await;
+        let first = requests.remove(0).await.unwrap();
+        for request in requests {
+            let loaded = request.await.unwrap();
+            assert!(Arc::ptr_eq(&first, &loaded));
+        }
+
+        // All callers must update the same state rather than discarded copies.
+        first.write().await.hrsa.step = 7;
+        let reloaded = get_or_load_thread(&state, &thread_id).await.unwrap();
+        assert_eq!(reloaded.read().await.hrsa.step, 7);
+    }
+
+    #[tokio::test]
+    async fn distinct_thread_ids_have_distinct_state() {
+        let state: SharedState = Arc::new(GlobalState {
+            projectors: RwLock::new(HashMap::new()),
+            threads: Cache::new(64),
+            cleanup_threshold: 3000,
+        });
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let a = format!("thread_a_{}_{}", std::process::id(), id);
+        let b = format!("thread_b_{}_{}", std::process::id(), id);
+        let ta = get_or_load_thread(&state, &a).await.unwrap();
+        let tb = get_or_load_thread(&state, &b).await.unwrap();
+        assert!(!Arc::ptr_eq(&ta, &tb));
+    }
 
     #[tokio::test]
     async fn checkpoint_replace_is_complete_and_atomic() {

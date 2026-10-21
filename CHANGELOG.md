@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- Bound daemon projection-matrix allocations to 64 million total `f32` entries (256 MB matrix storage); reject new embedding dimensions above 4096 or when the shared matrix budget is exhausted, and validate thread IDs before projector construction. Include budget and overflow regression tests.
+
 ## [0.3.0] - 2026-10-21
 
 ### Added

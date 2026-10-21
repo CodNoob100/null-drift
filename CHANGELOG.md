@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- A gateway `/health` readiness endpoint that checks the daemon, with integration-test readiness checks that require HTTP success rather than merely an open socket.
+
 ### Fixed
 
 - Remove the post-merge commit-message check that falsely failed CI for legitimate squash merges. GitHub branch protection remains responsible for enforcing PR-only merges.

@@ -4,7 +4,7 @@ No gateway, embedding model, or CrewAI/LangGraph installation is required.
 """
 
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from nulldrift_agents import NullDriftLangGraphStore
 
@@ -15,8 +15,9 @@ class LangGraphAdapterContractTests(unittest.IsolatedAsyncioTestCase):
         self.client_factory = client_patch.start()
         self.addCleanup(client_patch.stop)
         self.client = self.client_factory.return_value
-        self.client.post = AsyncMock()
-        self.client.get = AsyncMock()
+        self.client.post = AsyncMock(return_value=MagicMock())
+        self.client.get = AsyncMock(return_value=MagicMock())
+        self.client.aclose = AsyncMock()
         self.store = NullDriftLangGraphStore(gateway_url="http://localhost:8000/")
         self.namespace = ("team", "research")
 

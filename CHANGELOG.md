@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Remove the post-merge commit-message check that falsely failed CI for legitimate squash merges. GitHub branch protection remains responsible for enforcing PR-only merges.
+
 ### Changed
 
 - Report CI failures in pull-request checks without opening repeated issues, and treat transitive duplicate dependency versions as advisory output.

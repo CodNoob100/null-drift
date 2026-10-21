@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- Validate daemon thread IDs before using them in persisted state filenames; reject unsafe IDs with HTTP 400 and add regression tests.
+
 ### Added
 
 - `/health` endpoint to the `nulld` daemon returning HTTP 200 with `{"status": "ok"}` for Docker/Kubernetes readiness probes.

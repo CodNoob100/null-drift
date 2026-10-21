@@ -28,7 +28,9 @@ pub enum DaemonError {
     IoError(#[from] std::io::Error),
     #[error("Invalid embedding dimension")]
     InvalidDimension,
-    #[error("Invalid thread ID: expected 1–128 ASCII letters, digits, '-', '_' or '.' without '..'")]
+    #[error(
+        "Invalid thread ID: expected 1–128 ASCII letters, digits, '-', '_' or '.' without '..'"
+    )]
     InvalidThreadId,
 }
 
@@ -368,15 +370,37 @@ mod tests {
 
     #[test]
     fn accepts_safe_thread_ids() {
-        for id in ["default", "agent_007", "test_langgraph_agent1", "tenant-1", "agent.v2"] {
-            assert!(validate_thread_id(id).is_ok(), "rejected valid thread ID: {id}");
+        for id in [
+            "default",
+            "agent_007",
+            "test_langgraph_agent1",
+            "tenant-1",
+            "agent.v2",
+        ] {
+            assert!(
+                validate_thread_id(id).is_ok(),
+                "rejected valid thread ID: {id}"
+            );
         }
     }
 
     #[test]
     fn rejects_unsafe_thread_ids() {
-        for id in ["", ".", "..", "../escape", "a/../b", "a/b", "a\\b", "with space", "a\nb"] {
-            assert!(validate_thread_id(id).is_err(), "accepted unsafe thread ID: {id:?}");
+        for id in [
+            "",
+            ".",
+            "..",
+            "../escape",
+            "a/../b",
+            "a/b",
+            "a\\b",
+            "with space",
+            "a\nb",
+        ] {
+            assert!(
+                validate_thread_id(id).is_err(),
+                "accepted unsafe thread ID: {id:?}"
+            );
         }
         assert!(validate_thread_id(&"a".repeat(129)).is_err());
     }

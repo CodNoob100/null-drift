@@ -35,7 +35,9 @@ impl Projector {
 #[cfg(test)]
 mod compatibility_tests {
     use super::Projector;
-    use rand_distr05::{Distribution as LegacyDistribution, StandardNormal as LegacyStandardNormal};
+    use rand_distr05::{
+        Distribution as LegacyDistribution, StandardNormal as LegacyStandardNormal,
+    };
     use rand_pcg09::Pcg64 as LegacyPcg64;
 
     #[test]

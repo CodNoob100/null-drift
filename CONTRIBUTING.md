@@ -44,7 +44,7 @@ To help us triage issues efficiently, please observe our **Issue Naming Conventi
 
 ## ⚖️ Code Quality & CI Rules
 
-To maintain high engineering standards, our CI pipeline strictly enforces the following rules using custom automated bots. **Your PR will fail if these are not met:**
+To maintain high engineering standards, our CI pipeline strictly enforces the following rules using custom automated bots. **Your PR will fail if applicable blocking checks are not met:**
 
 1. **No Dead Code:** The use of `#[allow(dead_code)]` and `#[allow(unused)]` is strictly forbidden. 
 2. **TODO Formats & Lifespan:** 
@@ -54,7 +54,7 @@ To maintain high engineering standards, our CI pipeline strictly enforces the fo
    - **Rust:** Code must pass `cargo fmt --check` and `cargo clippy` with a strict zero-warnings policy (`-D warnings`).
    - **Python:** Code must pass `black --check` and `flake8` for style compliance.
 4. **Dependency Auditing:** 
-   - The dependency tree must not contain duplicate versions of the same crate (`cargo tree --duplicates`).
+   - `cargo tree --duplicates` reports transitive dependency duplication as a non-blocking warning; duplicates in upstream dependency graphs are not automatically considered actionable bugs.
    - All dependencies are audited for known CVEs via `cargo-audit` and `osv-scanner`.
 5. **No Secret Leaks:** Hardcoded secrets and credentials are automatically flagged and blocked by `gitleaks`.
 6. **Branch Protection:** The `main` branch is strictly protected. Force pushing and branch deletion are globally disabled. Status checks (including all CI rules above) must pass before a Pull Request can be merged.

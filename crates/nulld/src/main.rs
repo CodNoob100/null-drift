@@ -18,6 +18,25 @@ use std::time::Duration;
 use tokio::fs;
 use tokio::sync::RwLock;
 
+const HYPERVECTOR_DIM: usize = 10_000;
+const MAX_EMBEDDING_DIM: usize = 4_096;
+// 64 million f32 entries = 256 MB for all cached projection matrices combined.
+const MAX_PROJECTOR_ELEMENTS: usize = 64_000_000;
+
+fn projector_budget_allows(
+    cached_dimensions: impl Iterator<Item = usize>,
+    requested_dimension: usize,
+) -> bool {
+    if requested_dimension == 0 || requested_dimension > MAX_EMBEDDING_DIM {
+        return false;
+    }
+
+    cached_dimensions
+        .try_fold(requested_dimension, |sum, dim| sum.checked_add(dim))
+        .and_then(|sum| sum.checked_mul(HYPERVECTOR_DIM))
+        .is_some_and(|elements| elements <= MAX_PROJECTOR_ELEMENTS)
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum DaemonError {
     #[error("Failed to acquire lock")]
@@ -26,8 +45,10 @@ pub enum DaemonError {
     PostcardError(#[from] postcard::Error),
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
-    #[error("Invalid embedding dimension")]
+    #[error("Invalid embedding dimension (expected 1 to 4096 floats)")]
     InvalidDimension,
+    #[error("Projection matrix budget exhausted; reuse an existing embedding dimension")]
+    ProjectorBudgetExceeded,
     #[error(
         "Invalid thread ID: expected 1–128 ASCII letters, digits, '-', '_' or '.' without '..'"
     )]
@@ -39,6 +60,9 @@ impl IntoResponse for DaemonError {
         let (status, err_msg) = match self {
             DaemonError::InvalidDimension | DaemonError::InvalidThreadId => {
                 (StatusCode::BAD_REQUEST, self.to_string())
+            }
+            DaemonError::ProjectorBudgetExceeded => {
+                (StatusCode::SERVICE_UNAVAILABLE, self.to_string())
             }
             _ => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
@@ -142,7 +166,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     let mut projectors = HashMap::new();
-    projectors.insert(384, Arc::new(Projector::new(384, 10000)));
+    projectors.insert(384, Arc::new(Projector::new(384, HYPERVECTOR_DIM)));
 
     let cleanup_threshold = std::env::var("CLEANUP_THRESHOLD")
         .ok()
@@ -210,7 +234,7 @@ async fn get_or_load_thread(
 
     let new_ts = ThreadState {
         amn: AttractorIndex::new(state.cleanup_threshold),
-        hrsa: Hrsa::new(10000),
+        hrsa: Hrsa::new(HYPERVECTOR_DIM),
     };
     let ts = Arc::new(RwLock::new(new_ts));
     state
@@ -225,8 +249,10 @@ async fn handle_inject(
     Query(query): Query<ThreadQuery>,
     Json(payload): Json<InjectPayload>,
 ) -> Result<impl IntoResponse, DaemonError> {
+    // Validate all cheap request properties before allocating a new matrix.
+    validate_thread_id(&query.thread_id)?;
     let dim = payload.embedding.len();
-    if dim == 0 {
+    if dim == 0 || dim > MAX_EMBEDDING_DIM {
         return Err(DaemonError::InvalidDimension);
     }
 
@@ -237,9 +263,16 @@ async fn handle_inject(
         } else {
             drop(read_guard);
             let mut write_guard = state.projectors.write().await;
+            // Re-check the key after acquiring the write lock, because another
+            // request may have created the same projector in the meantime.
+            if !write_guard.contains_key(&dim)
+                && !projector_budget_allows(write_guard.keys().copied(), dim)
+            {
+                return Err(DaemonError::ProjectorBudgetExceeded);
+            }
             Arc::clone(write_guard.entry(dim).or_insert_with(|| {
                 println!("Dynamically instantiating projector for dimension: {}", dim);
-                Arc::new(Projector::new(dim, 10000))
+                Arc::new(Projector::new(dim, HYPERVECTOR_DIM))
             }))
         }
     };
@@ -366,7 +399,25 @@ async fn handle_restore(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_thread_id;
+    use super::{projector_budget_allows, validate_thread_id};
+
+    #[test]
+    fn projector_budget_accepts_normal_embedding_dimensions() {
+        assert!(projector_budget_allows([].into_iter(), 384));
+        assert!(projector_budget_allows([384].into_iter(), 768));
+        assert!(projector_budget_allows([384].into_iter(), 4096));
+        assert!(projector_budget_allows([384, 3072].into_iter(), 1536));
+    }
+
+    #[test]
+    fn projector_budget_rejects_large_or_excessive_allocations() {
+        assert!(!projector_budget_allows([].into_iter(), 0));
+        assert!(!projector_budget_allows([].into_iter(), 4097));
+        assert!(!projector_budget_allows([384, 4096].into_iter(), 2048));
+        assert!(!projector_budget_allows([6144].into_iter(), 257));
+        assert!(projector_budget_allows([6144].into_iter(), 256));
+        assert!(!projector_budget_allows([usize::MAX].into_iter(), 1));
+    }
 
     #[test]
     fn accepts_safe_thread_ids() {

@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Check HTTP error responses from synchronous Crew-style snapshot/restore requests instead of silently treating non-2xx replies as successful; add mocked client regression tests.
+
+### Fixed
+
 - Refuse to silently initialize an empty thread when a persisted checkpoint exists but is corrupt or unreadable. Only a missing snapshot creates a new state; return an explicit error and preserve the existing bytes. Add valid/corrupt/missing checkpoint regression tests.
 
 ### Fixed

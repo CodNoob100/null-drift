@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Log HTTP error responses from the Python LangGraph-style adapter's `aput` and `aget` methods consistently with network failures.
 - Refuse to silently initialize an empty thread when a persisted checkpoint exists but is corrupt or unreadable. Only a missing snapshot creates a new state; return an explicit error and preserve the existing bytes. Add valid/corrupt/missing checkpoint regression tests.
 
 ### Fixed

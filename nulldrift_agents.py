@@ -125,7 +125,7 @@ class NullDriftLangGraphStore(BaseStore):
                 f"{self.gateway_url}/inject", params={"thread_id": thread_id}, json=data
             )
             res.raise_for_status()
-        except httpx.RequestError as e:
+        except httpx.HTTPError as e:
             logging.error(f"NullDrift LangGraph async put failed: {e}")
 
     async def aget(self, namespace: tuple[str, ...], key: str) -> Optional[dict]:
@@ -140,7 +140,7 @@ class NullDriftLangGraphStore(BaseStore):
                 parsed = json.loads(data["recovered_text"])
                 if parsed.get("key") == key:
                     return parsed.get("value")
-        except httpx.RequestError as e:
+        except httpx.HTTPError as e:
             logging.error(f"NullDrift LangGraph async get failed: {e}")
         return None
 

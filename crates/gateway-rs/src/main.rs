@@ -62,11 +62,13 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or(4);
     println!("Loading {} fastembed models for concurrency...", num_models);
 
+    let environment = ort::init().build()?;
     let mut models = Vec::new();
     for _ in 0..num_models {
-        models.push(Mutex::new(TextEmbedding::try_new(TextInitOptions::new(
-            fastembed::EmbeddingModel::AllMiniLML6V2,
-        ))?));
+        models.push(Mutex::new(TextEmbedding::try_new(
+            TextInitOptions::new(fastembed::EmbeddingModel::AllMiniLML6V2)
+                .with_environment(environment.clone()),
+        )?));
     }
 
     let nulld_url =

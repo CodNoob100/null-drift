@@ -26,6 +26,17 @@ async def inject_event(client, thread_id, text, salience):
     res.raise_for_status()
 
 
+def check_recall(recovered):
+    if recovered == NEEDLE:
+        print("\n[SUCCESS] Needle perfectly recovered after 10,000 noise permutations!")
+        print(
+            "The Attractor Memory Network (AMN) successfully preserved the high-salience anchor."
+        )
+    else:
+        print("\n[FAILURE] Needle was lost or blurred in the thermodynamic drift!")
+        raise AssertionError("Recall did not recover the needle")
+
+
 async def run_test():
     print(f"Starting Needle-in-a-Haystack test on thread: {THREAD_ID}")
 
@@ -63,15 +74,7 @@ async def run_test():
         recovered = data.get("recovered_text")
         print(f"Recovered Text: {recovered}")
 
-        if recovered == NEEDLE:
-            print(
-                "\n[SUCCESS] Needle perfectly recovered after 10,000 noise permutations!"
-            )
-            print(
-                "The Attractor Memory Network (AMN) successfully preserved the high-salience anchor."
-            )
-        else:
-            print("\n[FAILURE] Needle was lost or blurred in the thermodynamic drift!")
+        check_recall(recovered)
 
 
 if __name__ == "__main__":

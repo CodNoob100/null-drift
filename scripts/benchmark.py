@@ -67,10 +67,9 @@ def run_benchmark(num_requests=100):
     print(f"Average Recall Latency: {statistics.mean(recall_times):.2f} ms")
     print(f"Disk Snapshot Latency: {snapshot_time:.2f} ms")
 
-    print("\n=== ARCHITECTURAL METRICS ===")
-    print("- Total State Memory per Thread: Strictly < 50 KB")
-    print("- Shared Global Projector Matrix: 15 MB")
-    print("- Time Complexity (Inject/Recall): O(1) mathematically bounded")
+    print(
+        "\nMemory consumption, projector size, and algorithmic complexity were not measured."
+    )
 
 
 if __name__ == "__main__":

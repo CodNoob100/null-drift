@@ -67,7 +67,7 @@ def run_benchmark(num_requests=100):
     print(f"Average Recall Latency: {statistics.mean(recall_times):.2f} ms")
     print(f"Disk Snapshot Latency: {snapshot_time:.2f} ms")
 
-    print("\nMemory consumption, projector size, and algorithmic complexity were not measured.")
+    print(\n        "\nMemory consumption, projector size, and algorithmic complexity were not measured."\n    )
 
 
 if __name__ == "__main__":

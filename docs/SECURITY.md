@@ -4,7 +4,7 @@
 
 ## Supported Versions
 
-Currently, only the latest `main` branch of `null-drift` is officially supported with security updates. 
+Currently, only the latest `main` branch of `null-drift` is officially supported with security updates. Published release tags (including `v0.3.0`) are not separately listed as supported versions.
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -41,7 +41,7 @@ We commit to the following patch timelines from the date of disclosure:
 2. **Denial of Service (DoS):** Any malformed payload that bypasses the `axum` `DefaultBodyLimit` (64KB) in the core daemon or causes uncontrolled memory allocation.
 3. **ONNX Runtime Exploits:** The `gateway-rs` microservice executes ML inference using `fastembed` and the C++ ONNX runtime. Any maliciously crafted text injection that achieves Remote Code Execution (RCE) via ONNX runtime buffer overflows is treated as a Critical CVE.
 4. **Postcard Deserialization:** Any vulnerability allowing Remote Code Execution (RCE) or arbitrary memory overwrites during the `state.nd` deserialization phase.
-5. **Multi-Tenant State Isolation:** We utilize `moka::future::Cache` to map and isolate distinct AI agents. Any vulnerability allowing Cross-Tenant State Leakage (reading or modifying a `ThreadState` belonging to another `thread_id`) is a critical vulnerability.
+5. **State Isolation:** The daemon uses a `thread_id` to select cached thread state. This is state separation, not a complete tenant authorization boundary; deployments must enforce appropriate access controls. Unauthorized state access is a high-priority security concern.
 
 If you find a mechanism that violates these boundaries, please report it immediately.
 
@@ -49,17 +49,20 @@ If you find a mechanism that violates these boundaries, please report it immedia
 
 ## 4. Recently Patched Vulnerabilities
 
-We continuously stress-test the architecture against extreme concurrency limits to proactively identify and patch denial-of-service (DoS) vectors:
-- **Algorithmic Complexity DoS (Patched in v0.2.0):** An $O(N^2)$ vector in the HRSA `/recall` endpoint previously allowed a single thread to lock the CPU for hours by triggering 500 billion nested permutations. This was mathematically optimized to a strict $O(1)$ constant bound (1 microsecond retrieval).
-- **Asynchronous Deadlocking (Patched in v0.2.0):** The `gateway-rs` inference microservice was patched to prevent malicious flooding of the async runtime. Synchronous C++ ONNX calls are now strictly wrapped via `tokio::task::spawn_blocking`, rendering the gateway immune to TCP starvation under massive load.
+The following changes address specific resource and concurrency risks. They are not guarantees of immunity to denial-of-service or fixed response times:
+- **Recall computation (changed in v0.2.0):** The recall path was refactored to avoid repeated inverse-permutation work. This does not establish a universal $O(1)$ bound for the entire request, constant memory use, or a one-microsecond response-time guarantee.
+- **Blocking inference (changed in v0.2.0):** The gateway moves synchronous inference work to blocking worker threads with `tokio::task::spawn_blocking`. This helps avoid blocking async executor threads but does not guarantee availability under overload.
 
 ---
 
 ## 5. Automated Boundary Enforcement
 
-To protect our Threat Model against accidental or malicious regressions, we run dedicated Security Bots in our CI pipeline:
+The repository runs advisory security scanners on pull requests, `main` pushes, and a weekly schedule. Their successful workflow conclusion does **not** mean the project is vulnerability-free:
 
-- **cargo-audit**: Prevents dependencies with known CVEs from being merged.
-- **gitleaks**: Actively blocks commits containing hardcoded secrets, API keys, or leaked credentials.
+- **cargo-audit**: Checks Rust dependencies for known advisories, but its current invocation is nonblocking (`|| true`) and does not prevent merges.
+- **Gitleaks**: Looks for potential secrets, but uses `--exit-code 0` and therefore does not block merges on findings.
+- **OSV Scanner**: Checks dependencies against vulnerability data, but its current invocation is nonblocking (`|| true`).
+
+OSV and Cargo Audit JSON outputs are not currently retained as CI artifacts; their findings cannot be inferred from a green workflow. See the [scanner workflow](../.github/workflows/security-scanners.yml) and the [evidence ledger](EVIDENCE.md) for verified limits and remaining validation needs.
 
 Thank you for helping keep the continuous AI memory ecosystem safe!

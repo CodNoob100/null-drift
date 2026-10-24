@@ -35,7 +35,7 @@ We commit to the following patch timelines from the date of disclosure:
 
 ## 3. Our Threat Model
 
-`null-drift`'s security boundaries are strictly defined. We are particularly interested in vulnerabilities related to:
+The following areas are security-sensitive and warrant private reporting. This list is not a claim that every boundary is fully enforced by the application:
 
 1. **State Poisoning:** We utilize `tokio::sync::RwLock` specifically to prevent panic-induced lock poisoning. Any vector capable of deadlocking or permanently poisoning the `Hrsa` state is a high-priority vulnerability.
 2. **Denial of Service (DoS):** Any malformed payload that bypasses the `axum` `DefaultBodyLimit` (64KB) in the core daemon or causes uncontrolled memory allocation.
@@ -47,7 +47,7 @@ If you find a mechanism that violates these boundaries, please report it immedia
 
 ---
 
-## 4. Recently Patched Vulnerabilities
+## 4. Targeted Risk Reductions
 
 The following changes address specific resource and concurrency risks. They are not guarantees of immunity to denial-of-service or fixed response times:
 - **Recall computation (changed in v0.2.0):** The recall path was refactored to avoid repeated inverse-permutation work. This does not establish a universal $O(1)$ bound for the entire request, constant memory use, or a one-microsecond response-time guarantee.
@@ -55,7 +55,7 @@ The following changes address specific resource and concurrency risks. They are 
 
 ---
 
-## 5. Automated Boundary Enforcement
+## 5. Advisory Security Scanning
 
 The repository runs advisory security scanners on pull requests, `main` pushes, and a weekly schedule. Their successful workflow conclusion does **not** mean the project is vulnerability-free:
 

@@ -174,6 +174,49 @@ struct SimpleResponse {
     status: String,
 }
 
+#[derive(Deserialize)]
+struct MemoryRequest {
+    operation: String,
+    namespace: Vec<String>,
+    #[serde(default)]
+    key: String,
+    value: Option<serde_json::Value>,
+    #[serde(default)]
+    offset: usize,
+    #[serde(default = "default_memory_limit")]
+    limit: usize,
+}
+
+fn default_memory_limit() -> usize {
+    100
+}
+
+async fn handle_memory(
+    State(state): State<SharedState>,
+    Json(request): Json<MemoryRequest>,
+) -> impl IntoResponse {
+    let mut ledger = state.identity.write().await;
+    let result = match request.operation.as_str() {
+        "put" => match request.value {
+            Some(value) => ledger
+                .put(&request.namespace, &request.key, value)
+                .map(|revision| serde_json::json!({"revision": revision})),
+            None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "value required"}))),
+        },
+        "get" => Ok(serde_json::json!({"record": ledger.get(&request.namespace, &request.key)})),
+        "delete" => ledger
+            .delete(&request.namespace, &request.key)
+            .map(|deleted| serde_json::json!({"deleted": deleted})),
+        "search" => Ok(serde_json::json!({"records": ledger.search(&request.namespace, request.offset, request.limit)})),
+        "namespaces" => Ok(serde_json::json!({"namespaces": ledger.namespaces(&request.namespace)})),
+        _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "unknown operation"}))),
+    };
+    match result {
+        Ok(value) => (StatusCode::OK, Json(value)),
+        Err(error) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("{error:?}")}))),
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting null-drift HRSA multi-tenant daemon...");

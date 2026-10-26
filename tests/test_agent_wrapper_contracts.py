@@ -71,6 +71,25 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await storage.client.aclose()
 
+    async def test_put_and_get_use_same_keyed_thread(self):
+        storage = NullDriftLangGraphStore()
+        try:
+            storage.client.post = AsyncMock(return_value=Mock())
+            recovered = '{"key": "key-1", "value": {"value": 1}}'
+            storage.client.get = AsyncMock(
+                return_value=Mock(json=lambda: {"recovered_text": recovered})
+            )
+            await storage.aput(("team", "agent"), "key-1", {"value": 1})
+            self.assertEqual(
+                await storage.aget(("team", "agent"), "key-1"), {"value": 1}
+            )
+            self.assertEqual(
+                storage.client.post.call_args.kwargs["params"],
+                storage.client.get.call_args.kwargs["params"],
+            )
+        finally:
+            await storage.client.aclose()
+
     async def test_get_ignores_mismatched_key(self):
         storage = NullDriftLangGraphStore()
         try:

@@ -48,6 +48,16 @@ class GatewayHealthTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 validate_local_url(url)
 
+    def test_connection_reset_propagates_to_retry_loop(self):
+        with patch(
+            "scripts.check_gateway_health.urllib.request.build_opener"
+        ) as open_url:
+            open_url.return_value.open.side_effect = ConnectionResetError(
+                "gateway warming up"
+            )
+            with self.assertRaises(ConnectionResetError):
+                check_health("http://127.0.0.1:8000")
+
     def test_transport_failure(self):
         with patch("scripts.check_gateway_health.urllib.request.build_opener") as mock:
             mock.return_value.open.side_effect = URLError("offline")

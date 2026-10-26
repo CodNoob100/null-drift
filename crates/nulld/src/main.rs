@@ -8,6 +8,7 @@ use axum::{
     routing::{get, post},
 };
 
+use identity_ledger::IdentityLedger;
 use moka::future::Cache;
 use ndarray::Array1;
 use null_drift_core::amn::AttractorIndex;
@@ -113,6 +114,7 @@ struct GlobalState {
     projectors: RwLock<HashMap<usize, Arc<Projector>>>,
     threads: Cache<String, Arc<RwLock<ThreadState>>>,
     cleanup_threshold: usize,
+    identity: RwLock<IdentityLedger>,
 }
 
 type SharedState = Arc<GlobalState>;
@@ -216,6 +218,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         projectors: RwLock::new(projectors),
         threads: cache,
         cleanup_threshold,
+        identity: RwLock::new(IdentityLedger::default()),
     };
 
     let state = Arc::new(global_state);
@@ -544,6 +547,7 @@ mod tests {
             projectors: RwLock::new(HashMap::new()),
             threads: Cache::new(64),
             cleanup_threshold: 3000,
+            identity: RwLock::new(IdentityLedger::default()),
         });
         let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
         let thread_id = format!("coalesce_{}_{}", std::process::id(), id);

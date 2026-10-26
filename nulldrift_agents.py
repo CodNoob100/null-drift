@@ -156,8 +156,11 @@ class NullDriftLangGraphStore(BaseStore):
             raise
         return None
 
-    async def take_snapshot(self, namespace: tuple[str, ...]) -> None:
-        thread_id = encode_namespace(namespace)
+    async def take_snapshot(
+        self, namespace: tuple[str, ...], key: Optional[str] = None
+    ) -> None:
+        """Snapshot one keyed thread when key is supplied."""
+        thread_id = encode_namespace(namespace, key)
         try:
             res = await self.client.post(
                 f"{self.gateway_url}/snapshot", params={"thread_id": thread_id}
@@ -167,8 +170,11 @@ class NullDriftLangGraphStore(BaseStore):
             logging.exception("NullDrift LangGraph async snapshot failed")
             raise
 
-    async def restore_from_snapshot(self, namespace: tuple[str, ...]) -> None:
-        thread_id = encode_namespace(namespace)
+    async def restore_from_snapshot(
+        self, namespace: tuple[str, ...], key: Optional[str] = None
+    ) -> None:
+        """Restore one keyed thread when key is supplied."""
+        thread_id = encode_namespace(namespace, key)
         try:
             res = await self.client.post(
                 f"{self.gateway_url}/restore", params={"thread_id": thread_id}

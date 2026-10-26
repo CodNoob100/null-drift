@@ -50,7 +50,9 @@ def check_health(base_url):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Wait for null-drift gateway readiness")
+    parser = argparse.ArgumentParser(
+        description="Wait for null-drift gateway readiness"
+    )
     parser.add_argument("--url", default="http://127.0.0.1:8000")
     parser.add_argument("--wait-seconds", type=int, default=180)
     args = parser.parse_args()

@@ -1,0 +1,28 @@
+name: Native Framework Memory Rust
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/nulld/**"
+      - "crates/gateway-rs/**"
+      - ".github/workflows/native-memory-rust.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-memory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Compile and test native daemon
+        run: cargo test -p nulld --all-targets
+      - name: Compile gateway
+        run: cargo check -p gateway-rs

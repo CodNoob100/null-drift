@@ -683,7 +683,7 @@ mod tests {
             projectors: RwLock::new(HashMap::new()),
             threads: Cache::new(64),
             cleanup_threshold: 3000,
-            identity: RwLock::new(IdentityLedger::default()),
+            identity: RwLock::new(crate::IdentityLedger::default()),
         });
         let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
         let a = format!("thread_a_{}_{}", std::process::id(), id);

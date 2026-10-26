@@ -20,6 +20,8 @@ If the first health request fails while the model initializes, use the bounded, 
 python3 scripts/check_gateway_health.py --url http://127.0.0.1:8000 --wait-seconds 180
 ```
 
+The readiness probe has offline mock tests: `python3 -m unittest discover -s tests -p 'test_gateway_health.py'`. These tests do not start Docker or verify the real gateway.
+
 If it times out, inspect `docker compose -f docker/docker-compose.yml ps` and `docker compose -f docker/docker-compose.yml logs --tail=100 gateway nulld`. Initial model downloads can exceed this window; a timeout is diagnostic, not proof of permanent failure.
 
 **Expected health response once both services are ready:** `{"status":"ok"}`. Model initialization may take time on first startup; if health is unavailable, inspect logs instead of assuming success:

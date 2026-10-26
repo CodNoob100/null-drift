@@ -229,6 +229,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/recall", get(handle_recall))
         .route("/snapshot", post(handle_snapshot))
         .route("/restore", post(handle_restore))
+        .route("/memory", post(handle_memory))
         .layer(DefaultBodyLimit::max(64 * 1024))
         .with_state(state);
 

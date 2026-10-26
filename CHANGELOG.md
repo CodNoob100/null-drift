@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Handle HTTP 4xx/5xx in the LangGraph async snapshot and restore helpers: they caught only `httpx.RequestError`, so `raise_for_status()`'s `HTTPStatusError` escaped the logging path and propagated to the caller. Regression tests cover 4xx/5xx, transport failures, and the silent-success path via `httpx.MockTransport`.
 - Refuse to silently initialize an empty thread when a persisted checkpoint exists but is corrupt or unreadable. Only a missing snapshot creates a new state; return an explicit error and preserve the existing bytes. Add valid/corrupt/missing checkpoint regression tests.
 
 ### Fixed

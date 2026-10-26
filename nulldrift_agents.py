@@ -121,6 +121,8 @@ class NullDriftLangGraphStore(BaseStore):
         Maps LangGraph's namespace to a specific null-drift thread_id, giving every
         namespace its own isolated 10,000D phase space.
         """
+        if not isinstance(value, dict):
+            raise TypeError("value must be a dictionary")
         thread_id = encode_namespace(namespace, key)
         text_payload = json.dumps({"key": key, "value": value})
         data = {"text": text_payload, "salience": 1.0}
@@ -147,7 +149,7 @@ class NullDriftLangGraphStore(BaseStore):
             data = res.json()
             if data.get("recovered_text"):
                 parsed = json.loads(data["recovered_text"])
-                if parsed.get("key") == key:
+                if isinstance(parsed, dict) and parsed.get("key") == key:
                     return parsed.get("value")
         except httpx.RequestError:
             logging.exception("NullDrift LangGraph async get failed")

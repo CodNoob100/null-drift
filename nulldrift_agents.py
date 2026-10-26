@@ -4,6 +4,13 @@ import logging
 from typing import Any, Callable, Dict, List, Optional
 
 
+def encode_namespace(namespace: tuple[str, ...]) -> str:
+    """Encode tuple boundaries unambiguously for gateway thread isolation."""
+    if not namespace or any(not isinstance(part, str) or not part for part in namespace):
+        raise ValueError("namespace must contain nonempty strings")
+    return "lg_" + json.dumps(namespace, separators=(",", ":"), ensure_ascii=False).encode("utf-8").hex()
+
+
 # Protocol Stubs (Assuming CrewAI and LangGraph are installed in the user's environment)
 class StorageBackend:
     pass
@@ -109,7 +116,7 @@ class NullDriftLangGraphStore(BaseStore):
         Maps LangGraph's namespace to a specific null-drift thread_id, giving every
         namespace its own isolated 10,000D phase space.
         """
-        thread_id = "_".join(namespace)
+        thread_id = encode_namespace(namespace)
         text_payload = json.dumps({"key": key, "value": value})
         data = {"text": text_payload, "salience": 1.0}
 

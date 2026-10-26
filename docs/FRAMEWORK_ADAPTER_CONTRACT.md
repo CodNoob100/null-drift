@@ -71,18 +71,13 @@ results. No production deployment or migration should depend on the wrappers
 until the contract tests are green.
 
 
-## Durable LangGraph store implementation (draft PR #188)
+## Database-free implementation status
 
-`nulldrift_langgraph_sqlite.NullDriftSQLiteStore(path)` is a separate,
-**real `langgraph.store.base.BaseStore` subclass** using SQLite for an
-authoritative multi-key index. It implements `batch` and `abatch`, keyed
-get/put/delete, namespace prefix search, namespace listing, and durable
-records across process reopen. Install `langgraph-checkpoint` before importing
-this optional module. Run `python -m unittest discover -s tests -p
-test_langgraph_sqlite_contract.py -v` with that dependency installed.
+The gateway-only `NullDriftGatewayStore` uses null-drift's existing
+`/inject` and `/recall` APIs, without SQLite or another database.
+It implements a limited `BaseStore` operation subset. Native keyed
+deletion, complete namespace enumeration, and crash-durable exact records
+remain unimplemented. Unsupported operations must fail explicitly.
 
-This is **not** a gateway-backed storage adapter: it does not automatically
-inject data into null-drift, and the original HTTP convenience wrappers are
-unchanged. Semantic/vector search and TTL are intentionally unsupported and
-must not be advertised as available. Real dependency contract CI is required
-before calling this integration verified.
+See `docs/DB_FREE_FRAMEWORK_MEMORY_RESEARCH.md` for the literature-backed
+native AMN/HRSA design and acceptance criteria.

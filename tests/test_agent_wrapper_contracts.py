@@ -153,6 +153,26 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await storage.client.aclose()
 
+    async def test_put_rejects_non_dictionary_value(self):
+        storage = NullDriftLangGraphStore()
+        try:
+            storage.client.post = AsyncMock()
+            with self.assertRaises(TypeError):
+                await storage.aput(("team",), "key-1", ["not a dict"])
+            storage.client.post.assert_not_awaited()
+        finally:
+            await storage.client.aclose()
+
+    async def test_get_ignores_non_object_recall_payload(self):
+        storage = NullDriftLangGraphStore()
+        try:
+            storage.client.get = AsyncMock(
+                return_value=Mock(json=lambda: {"recovered_text": '["unexpected"]'})
+            )
+            self.assertIsNone(await storage.aget(("team",), "key-1"))
+        finally:
+            await storage.client.aclose()
+
     async def test_get_ignores_mismatched_key(self):
         storage = NullDriftLangGraphStore()
         try:

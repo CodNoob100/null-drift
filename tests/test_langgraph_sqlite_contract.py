@@ -5,11 +5,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from langgraph.store.base import BaseStore, GetOp, ListNamespacesOp, PutOp, SearchOp
+try:
+    from langgraph.store.base import BaseStore, GetOp, ListNamespacesOp, PutOp, SearchOp
+    from nulldrift_langgraph_sqlite import NullDriftSQLiteStore
+except ImportError:
+    BaseStore = None
 
-from nulldrift_langgraph_sqlite import NullDriftSQLiteStore
 
-
+@unittest.skipIf(BaseStore is None, "langgraph-checkpoint is not installed")
 class RealLangGraphStoreTests(unittest.TestCase):
     def test_multi_key_overwrite_delete_and_restart(self):
         with tempfile.TemporaryDirectory() as directory:

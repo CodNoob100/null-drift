@@ -68,7 +68,12 @@ def main():
             if check_health(args.url):
                 print("Gateway is healthy")
                 return 0
-        except (urllib.error.URLError, TimeoutError, ConnectionError, ValueError) as exc:
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            ConnectionError,
+            ValueError,
+        ) as exc:
             print("Waiting for gateway: {}".format(exc), file=sys.stderr)
         if time.monotonic() >= deadline:
             print("Gateway did not become ready; inspect Compose logs", file=sys.stderr)

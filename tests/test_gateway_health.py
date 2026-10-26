@@ -11,7 +11,9 @@ from scripts.check_gateway_health import check_health, validate_local_url
 
 class GatewayHealthTests(unittest.TestCase):
     def test_ready(self):
-        with patch("scripts.check_gateway_health.urllib.request.build_opener") as open_url:
+        with patch(
+            "scripts.check_gateway_health.urllib.request.build_opener"
+        ) as open_url:
             payload = io.BytesIO(json.dumps({"status": "ok"}).encode("utf-8"))
             open_url.return_value.open.return_value.__enter__.return_value = payload
             self.assertTrue(check_health("http://127.0.0.1:8000/"))
@@ -21,7 +23,9 @@ class GatewayHealthTests(unittest.TestCase):
             )
 
     def test_unavailable_status(self):
-        with patch("scripts.check_gateway_health.urllib.request.build_opener") as open_url:
+        with patch(
+            "scripts.check_gateway_health.urllib.request.build_opener"
+        ) as open_url:
             payload = io.BytesIO(json.dumps({"status": "unavailable"}).encode("utf-8"))
             open_url.return_value.open.return_value.__enter__.return_value = payload
             self.assertFalse(check_health("http://127.0.0.1:8000"))

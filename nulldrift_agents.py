@@ -1,3 +1,4 @@
+import hashlib
 import httpx
 import json
 import logging
@@ -10,8 +11,9 @@ def encode_namespace(namespace: tuple[str, ...], key: Optional[str] = None) -> s
         raise ValueError("namespace must contain nonempty strings")
     if key is not None and (not isinstance(key, str) or not key):
         raise ValueError("key must be a nonempty string")
-    parts = [*namespace, key] if key is not None else list(namespace)
-    return "lg_" + json.dumps(parts, separators=(",", ":"), ensure_ascii=False).encode("utf-8").hex()
+    identity = {"namespace": namespace, "key": key}
+    payload = json.dumps(identity, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return "lg_" + hashlib.sha256(payload).hexdigest()
 
 
 # Protocol Stubs (Assuming CrewAI and LangGraph are installed in the user's environment)

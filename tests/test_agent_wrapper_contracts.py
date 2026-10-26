@@ -92,7 +92,8 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
             args, kwargs = storage.client.post.call_args
             self.assertTrue(args[0].endswith("/inject"))
             self.assertEqual(
-                kwargs["params"], {"thread_id": encode_namespace(("team", "agent"), "key-1")}
+                kwargs["params"],
+                {"thread_id": encode_namespace(("team", "agent"), "key-1")},
             )
             self.assertIn('"key": "key-1"', kwargs["json"]["text"])
         finally:

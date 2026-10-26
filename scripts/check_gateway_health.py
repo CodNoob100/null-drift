@@ -3,6 +3,7 @@
 
 Usage: python3 scripts/check_gateway_health.py [--url http://127.0.0.1:8000] [--wait-seconds 180]
 """
+
 import argparse
 import json
 import sys
@@ -41,9 +42,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def check_health(base_url):
     validate_local_url(base_url)
-    opener = urllib.request.build_opener(
-        urllib.request.ProxyHandler({}), NoRedirect()
-    )
+    no_proxy = urllib.request.ProxyHandler({})
+    opener = urllib.request.build_opener(no_proxy, NoRedirect())
     with opener.open(base_url.rstrip("/") + "/health", timeout=5) as response:
         payload = json.load(response)
     return isinstance(payload, dict) and payload.get("status") == "ok"

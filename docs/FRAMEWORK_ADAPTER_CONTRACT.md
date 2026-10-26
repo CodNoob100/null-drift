@@ -15,9 +15,10 @@ and `aput` stores a single `{"key": ..., "value": ...}` payload under
 a deterministic SHA-256-derived thread ID for the namespace and key. This
 separates namespace-only and keyed identities and bounds identifier length.
 
-Namespace-only snapshot/restore uses a different thread ID from keyed writes;
-these methods do **not** currently snapshot the keyed records. Do not depend
-on them for keyed persistence.
+Snapshot and restore accept an optional key: supply the same namespace and key
+used for `aput` to target that specific thread. Omitting the key targets the
+namespace-only thread, **not** all keys in that namespace. Cross-restart
+persistence remains unverified.
 
 The gateway's dominant-state recall is not a durable multi-key index. An
 upstream-compatible adapter must use a separate authoritative keyed backend

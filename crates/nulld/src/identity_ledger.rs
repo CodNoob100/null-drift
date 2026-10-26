@@ -32,7 +32,9 @@ impl IdentityLedger {
     fn validate(namespace: &[String], key: &str) -> Result<(), LedgerError> {
         if namespace.is_empty()
             || namespace.len() > 32
-            || namespace.iter().any(|part| part.is_empty() || part.len() > 256)
+            || namespace
+                .iter()
+                .any(|part| part.is_empty() || part.len() > 256)
             || key.is_empty()
             || key.len() > 256
         {
@@ -94,7 +96,10 @@ impl IdentityLedger {
             .iter()
             .position(|r| r.namespace == namespace && r.key == key)
         {
-            self.revision = self.revision.checked_add(1).ok_or(LedgerError::CapacityExceeded)?;
+            self.revision = self
+                .revision
+                .checked_add(1)
+                .ok_or(LedgerError::CapacityExceeded)?;
             self.records.remove(index);
             return Ok(true);
         }
@@ -150,31 +155,53 @@ mod tests {
         ledger
             .put(&a, "first", serde_json::json!({"v": 4}))
             .unwrap();
-        assert_eq!(serde_json::from_str::<serde_json::Value>(&ledger.get(&a, "first").unwrap().value).unwrap()["v"], 4);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&ledger.get(&a, "first").unwrap().value)
+                .unwrap()["v"],
+            4
+        );
         assert_eq!(ledger.search(&["tenant".into()], 1, 1).len(), 1);
         assert_eq!(ledger.namespaces(&["tenant".into()]).len(), 2);
         assert!(ledger.delete(&a, "first").unwrap());
         assert!(ledger.get(&a, "first").is_none());
-        assert_eq!(serde_json::from_str::<serde_json::Value>(&ledger.get(&a, "second").unwrap().value).unwrap()["v"], 2);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&ledger.get(&a, "second").unwrap().value)
+                .unwrap()["v"],
+            2
+        );
     }
 
     #[test]
     fn postcard_roundtrip_preserves_identity() {
         let mut ledger = IdentityLedger::default();
         let namespace = vec!["team".into()];
-        ledger.put(&namespace, "key", serde_json::json!({"text": "hello"})).unwrap();
+        ledger
+            .put(&namespace, "key", serde_json::json!({"text": "hello"}))
+            .unwrap();
         let bytes = postcard::to_stdvec(&ledger).unwrap();
         let restored: IdentityLedger = postcard::from_bytes(&bytes).unwrap();
-        assert_eq!(serde_json::from_str::<serde_json::Value>(&restored.get(&namespace, "key").unwrap().value).unwrap()["text"], "hello");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(
+                &restored.get(&namespace, "key").unwrap().value
+            )
+            .unwrap()["text"],
+            "hello"
+        );
     }
 
     #[test]
     fn snapshot_recovery_preserves_overwrites_and_deletions() {
         let mut ledger = IdentityLedger::default();
         let namespace = vec!["tenant".into(), "agent".into()];
-        ledger.put(&namespace, "a", serde_json::json!({"v": 1})).unwrap();
-        ledger.put(&namespace, "b", serde_json::json!({"v": 2})).unwrap();
-        ledger.put(&namespace, "a", serde_json::json!({"v": 3})).unwrap();
+        ledger
+            .put(&namespace, "a", serde_json::json!({"v": 1}))
+            .unwrap();
+        ledger
+            .put(&namespace, "b", serde_json::json!({"v": 2}))
+            .unwrap();
+        ledger
+            .put(&namespace, "a", serde_json::json!({"v": 3}))
+            .unwrap();
         assert!(ledger.delete(&namespace, "b").unwrap());
         let snapshot = postcard::to_stdvec(&ledger).unwrap();
         let recovered: IdentityLedger = postcard::from_bytes(&snapshot).unwrap();
@@ -200,7 +227,10 @@ mod tests {
     #[test]
     fn rejects_invalid_and_oversized_payloads() {
         let mut ledger = IdentityLedger::default();
-        assert_eq!(ledger.put(&[], "x", serde_json::json!({})), Err(LedgerError::InvalidIdentity));
+        assert_eq!(
+            ledger.put(&[], "x", serde_json::json!({})),
+            Err(LedgerError::InvalidIdentity)
+        );
         assert_eq!(
             ledger.put(&["team".into()], "x", serde_json::json!([1, 2])),
             Err(LedgerError::InvalidValue)

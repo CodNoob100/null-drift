@@ -229,8 +229,31 @@ async fn handle_memory(
         _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "unknown operation"}))),
     };
     match result {
-        Ok(value) => (StatusCode::OK, Json(value)),
-        Err(error) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": format!("{error:?}")}))),
+        Ok(value) => {
+            if request.operation == "put" || request.operation == "delete" {
+                let bytes = match postcard::to_stdvec(&*ledger) {
+                    Ok(bytes) => bytes,
+                    Err(_) => return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({"error": "memory serialization failed"})),
+                    ),
+                };
+                if persist_snapshot(Path::new(FRAMEWORK_MEMORY_SNAPSHOT), &bytes)
+                    .await
+                    .is_err()
+                {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({"error": "memory snapshot failed"})),
+                    );
+                }
+            }
+            (StatusCode::OK, Json(value))
+        }
+        Err(error) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": format!("{error:?}")})),
+        ),
     }
 }
 

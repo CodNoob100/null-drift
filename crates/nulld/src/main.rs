@@ -213,9 +213,11 @@ async fn handle_memory(
     Json(request): Json<MemoryRequest>,
 ) -> impl IntoResponse {
     let mut ledger = state.identity.write().await;
+    let is_mutation = request.operation == "put" || request.operation == "delete";
+    let mut staged = ledger.clone();
     let result = match request.operation.as_str() {
         "put" => match request.value {
-            Some(value) => ledger
+            Some(value) => staged
                 .put(&request.namespace, &request.key, value)
                 .map(|revision| serde_json::json!({"revision": revision})),
             None => {
@@ -226,7 +228,7 @@ async fn handle_memory(
             }
         },
         "get" => Ok(serde_json::json!({"record": ledger.get(&request.namespace, &request.key)})),
-        "delete" => ledger
+        "delete" => staged
             .delete(&request.namespace, &request.key)
             .map(|deleted| serde_json::json!({"deleted": deleted})),
         "search" => Ok(serde_json::json!({"records": ledger.search(&request.namespace, request.offset, request.limit)})),
@@ -240,8 +242,8 @@ async fn handle_memory(
     };
     match result {
         Ok(value) => {
-            if request.operation == "put" || request.operation == "delete" {
-                let bytes = match postcard::to_stdvec(&*ledger) {
+            if is_mutation {
+                let bytes = match postcard::to_stdvec(&staged) {
                     Ok(bytes) => bytes,
                     Err(_) => {
                         return (
@@ -259,6 +261,7 @@ async fn handle_memory(
                         Json(serde_json::json!({"error": "memory snapshot failed"})),
                     );
                 }
+                *ledger = staged;
             }
             (StatusCode::OK, Json(value))
         }

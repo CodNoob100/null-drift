@@ -139,7 +139,7 @@ class NullDriftLangGraphStore(BaseStore):
             logging.error(f"NullDrift LangGraph async put failed: {e}")
 
     async def aget(self, namespace: tuple[str, ...], key: str) -> Optional[dict]:
-        thread_id = "_".join(namespace)
+        thread_id = encode_namespace(namespace, key)
         try:
             res = await self.client.get(
                 f"{self.gateway_url}/recall", params={"thread_id": thread_id}
@@ -155,7 +155,7 @@ class NullDriftLangGraphStore(BaseStore):
         return None
 
     async def take_snapshot(self, namespace: tuple[str, ...]) -> None:
-        thread_id = "_".join(namespace)
+        thread_id = encode_namespace(namespace)
         try:
             res = await self.client.post(
                 f"{self.gateway_url}/snapshot", params={"thread_id": thread_id}
@@ -165,7 +165,7 @@ class NullDriftLangGraphStore(BaseStore):
             logging.error(f"NullDrift LangGraph async snapshot failed: {e}")
 
     async def restore_from_snapshot(self, namespace: tuple[str, ...]) -> None:
-        thread_id = "_".join(namespace)
+        thread_id = encode_namespace(namespace)
         try:
             res = await self.client.post(
                 f"{self.gateway_url}/restore", params={"thread_id": thread_id}

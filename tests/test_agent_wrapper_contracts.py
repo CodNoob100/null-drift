@@ -2,6 +2,7 @@
 
 These do not establish compatibility with upstream LangGraph or CrewAI interfaces.
 """
+
 import unittest
 from unittest.mock import AsyncMock, Mock
 
@@ -50,13 +51,9 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_ignores_mismatched_key(self):
         storage = NullDriftLangGraphStore()
         try:
-            storage.client.get = AsyncMock(
-                return_value=Mock(
-                    json=lambda: {
-                        "recovered_text": '{"key": "other", "value": {"x": 1}}'
-                    }
-                )
-            )
+            recovered = '{"key": "other", "value": {"x": 1}}'
+            response = Mock(json=lambda: {"recovered_text": recovered})
+            storage.client.get = AsyncMock(return_value=response)
             self.assertIsNone(await storage.aget(("team",), "wanted"))
         finally:
             await storage.client.aclose()

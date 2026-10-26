@@ -7,14 +7,18 @@ from typing import Any, Callable, Dict, List, Optional
 
 def encode_namespace(namespace: tuple[str, ...], key: Optional[str] = None) -> str:
     """Encode tuple boundaries unambiguously for gateway thread isolation."""
-    if not isinstance(namespace, tuple) or not namespace or any(
-        not isinstance(part, str) or not part for part in namespace
+    if (
+        not isinstance(namespace, tuple)
+        or not namespace
+        or any(not isinstance(part, str) or not part for part in namespace)
     ):
         raise ValueError("namespace must contain nonempty strings")
     if key is not None and (not isinstance(key, str) or not key):
         raise ValueError("key must be a nonempty string")
     identity = {"namespace": namespace, "key": key}
-    payload = json.dumps(identity, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    payload = json.dumps(identity, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
     return "lg_" + hashlib.sha256(payload).hexdigest()
 
 

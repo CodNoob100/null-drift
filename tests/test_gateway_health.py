@@ -16,7 +16,8 @@ class GatewayHealthTests(unittest.TestCase):
             )
             self.assertTrue(check_health("http://127.0.0.1:8000/"))
             self.assertEqual(
-                open_url.return_value.open.call_args.args[0], "http://127.0.0.1:8000/health"
+                open_url.return_value.open.call_args.args[0],
+                "http://127.0.0.1:8000/health",
             )
 
     def test_unavailable_status(self):

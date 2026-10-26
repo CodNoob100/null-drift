@@ -19,7 +19,6 @@ from langgraph.store.base import (
 )
 
 
-
 class NullDriftGatewayStore(BaseStore):
     """Conservative LangGraph BaseStore adapter for keyed gateway threads.
 

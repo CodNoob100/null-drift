@@ -8,6 +8,13 @@ GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:8000")
 THREAD_ID = "benchmark_thread"
 
 
+def latency_summary(samples: list[float]) -> str:
+    """Mean latency of nonempty timing samples in ms; explicit marker if empty."""
+    if not samples:
+        return "unavailable (no samples)"
+    return f"{statistics.mean(samples):.2f} ms"
+
+
 def run_benchmark(num_requests=100):
     print(f"Waiting for Gateway at {GATEWAY_URL}...")
     for _ in range(30):
@@ -59,12 +66,13 @@ def run_benchmark(num_requests=100):
 
     print("\n=== PERFORMANCE METRICS ===")
     print(f"Total Requests: {num_requests} injects, 10 recalls")
-    print(
-        f"Average Inject Latency (End-to-End): {statistics.mean(inject_times):.2f} ms"
-    )
-    print(f"Fastest Inject: {min(inject_times):.2f} ms")
-    print(f"Slowest Inject: {max(inject_times):.2f} ms")
-    print(f"Average Recall Latency: {statistics.mean(recall_times):.2f} ms")
+    for label, summary in (
+        ("Average Inject Latency (End-to-End)", latency_summary(inject_times)),
+        ("Fastest Inject", f"{min(inject_times):.2f} ms"),
+        ("Slowest Inject", f"{max(inject_times):.2f} ms"),
+        ("Average Recall Latency", latency_summary(recall_times)),
+    ):
+        print(f"{label}: {summary}")
     print(f"Disk Snapshot Latency: {snapshot_time:.2f} ms")
 
     print("\n=== ARCHITECTURAL METRICS ===")

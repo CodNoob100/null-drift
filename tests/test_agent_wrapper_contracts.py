@@ -140,6 +140,23 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await storage.client.aclose()
 
+    async def test_keyed_snapshot_targets_written_thread(self):
+        storage = NullDriftLangGraphStore()
+        try:
+            storage.client.post = AsyncMock(return_value=Mock())
+            await storage.aput(("team",), "key-1", {"value": 1})
+            write_thread = storage.client.post.call_args.kwargs["params"]
+            await storage.take_snapshot(("team",), "key-1")
+            self.assertEqual(
+                storage.client.post.call_args.kwargs["params"], write_thread
+            )
+            await storage.restore_from_snapshot(("team",), "key-1")
+            self.assertEqual(
+                storage.client.post.call_args.kwargs["params"], write_thread
+            )
+        finally:
+            await storage.client.aclose()
+
     async def test_snapshot_and_restore_use_same_namespace_thread(self):
         storage = NullDriftLangGraphStore()
         try:

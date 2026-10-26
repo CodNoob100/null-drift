@@ -1,3 +1,4 @@
+import argparse
 import os
 import httpx
 import uuid
@@ -10,6 +11,18 @@ GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:8000")
 THREAD_ID = f"needle_thread_{uuid.uuid4().hex[:8]}"
 
 NEEDLE = "The nuclear launch code is 8402-DELTA-X"
+
+parser = argparse.ArgumentParser(description="Needle-in-a-haystack recall test")
+parser.add_argument(
+    "--seed",
+    type=int,
+    default=None,
+    help="seed the noise generator for reproducible " "payloads (default: random)",
+)
+args = parser.parse_args()
+if args.seed is not None:
+    random.seed(args.seed)
+    print(f"Using noise seed: {args.seed}")
 
 
 def generate_noise():

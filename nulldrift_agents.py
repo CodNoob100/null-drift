@@ -151,7 +151,7 @@ class NullDriftLangGraphStore(BaseStore):
                 f"{self.gateway_url}/snapshot", params={"thread_id": thread_id}
             )
             res.raise_for_status()
-        except httpx.RequestError as e:
+        except httpx.HTTPError as e:
             logging.error(f"NullDrift LangGraph async snapshot failed: {e}")
 
     async def restore_from_snapshot(self, namespace: tuple[str, ...]) -> None:
@@ -161,5 +161,5 @@ class NullDriftLangGraphStore(BaseStore):
                 f"{self.gateway_url}/restore", params={"thread_id": thread_id}
             )
             res.raise_for_status()
-        except httpx.RequestError as e:
+        except httpx.HTTPError as e:
             logging.error(f"NullDrift LangGraph async restore failed: {e}")

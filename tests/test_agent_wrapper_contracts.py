@@ -66,6 +66,18 @@ class NamespaceEncodingTests(unittest.TestCase):
         self.assertEqual(len(first), 67)
         self.assertTrue(first.startswith("lg_"))
 
+    def test_rejects_non_tuple_namespace(self):
+        with self.assertRaises(ValueError):
+            encode_namespace(["team", "agent"])
+        with self.assertRaises(ValueError):
+            encode_namespace("team")
+
+    def test_rejects_invalid_key(self):
+        with self.assertRaises(ValueError):
+            encode_namespace(("team",), "")
+        with self.assertRaises(ValueError):
+            encode_namespace(("team",), 42)
+
     def test_rejects_empty_namespace(self):
         with self.assertRaises(ValueError):
             encode_namespace(())

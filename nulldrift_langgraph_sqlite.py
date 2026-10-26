@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timezone
 
 import httpx
-from langgraph.store.base import BaseStore, GetOp, Item, PutOp
+from langgraph.store.base import BaseStore, GetOp, Item, PutOp, SearchOp
 
 from nulldrift_agents import encode_namespace
 
@@ -63,6 +63,28 @@ class NullDriftGatewayStore(BaseStore):
                 else:
                     self._memory("put", op.namespace, key=op.key, value=op.value)
                 results.append(None)
+            elif isinstance(op, SearchOp):
+                if op.query is not None or op.filter is not None:
+                    raise NotImplementedError("Semantic search and filters are not supported")
+                payload = self._memory(
+                    "search",
+                    op.namespace_prefix,
+                    offset=op.offset,
+                    limit=op.limit,
+                )
+                now = datetime.now(timezone.utc)
+                results.append(
+                    [
+                        Item(
+                            namespace=tuple(record["namespace"]),
+                            key=record["key"],
+                            value=json.loads(record["value"]),
+                            created_at=now,
+                            updated_at=now,
+                        )
+                        for record in payload["records"]
+                    ]
+                )
             else:
                 raise NotImplementedError("Unsupported LangGraph operation")
         return results

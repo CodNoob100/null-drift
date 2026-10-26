@@ -218,7 +218,12 @@ async fn handle_memory(
             Some(value) => ledger
                 .put(&request.namespace, &request.key, value)
                 .map(|revision| serde_json::json!({"revision": revision})),
-            None => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "value required"}))),
+            None => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({"error": "value required"})),
+                );
+            }
         },
         "get" => Ok(serde_json::json!({"record": ledger.get(&request.namespace, &request.key)})),
         "delete" => ledger
@@ -226,17 +231,24 @@ async fn handle_memory(
             .map(|deleted| serde_json::json!({"deleted": deleted})),
         "search" => Ok(serde_json::json!({"records": ledger.search(&request.namespace, request.offset, request.limit)})),
         "namespaces" => Ok(serde_json::json!({"namespaces": ledger.namespaces(&request.namespace)})),
-        _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "unknown operation"}))),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "unknown operation"})),
+            );
+        }
     };
     match result {
         Ok(value) => {
             if request.operation == "put" || request.operation == "delete" {
                 let bytes = match postcard::to_stdvec(&*ledger) {
                     Ok(bytes) => bytes,
-                    Err(_) => return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(serde_json::json!({"error": "memory serialization failed"})),
-                    ),
+                    Err(_) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(serde_json::json!({"error": "memory serialization failed"})),
+                        );
+                    }
                 };
                 if persist_snapshot(Path::new(FRAMEWORK_MEMORY_SNAPSHOT), &bytes)
                     .await

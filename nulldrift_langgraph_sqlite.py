@@ -1,140 +1,90 @@
-"""Durable LangGraph BaseStore implementation backed by SQLite.
+"""Legacy filename: database-free LangGraph gateway adapter.
 
-Requires langgraph-checkpoint (which provides langgraph.store.base).
-Unlike the gateway's dominant recall, this store preserves multiple keys.
-Semantic/vector search and TTL are intentionally unsupported.
+This module uses only null-drift gateway endpoints. It deliberately rejects
+operations the gateway cannot implement faithfully. No SQL or local DB.
 """
 
 import asyncio
 import json
-import sqlite3
 from datetime import datetime, timezone
 
-from langgraph.store.base import (
-    BaseStore,
-    GetOp,
-    Item,
-    ListNamespacesOp,
-    PutOp,
-    SearchItem,
-    SearchOp,
-)
+import httpx
+from langgraph.store.base import BaseStore, GetOp, Item, PutOp
+
+from nulldrift_agents import encode_namespace
 
 
-class NullDriftSQLiteStore(BaseStore):
-    """Real LangGraph storage contract with an authoritative keyed index."""
+class NullDriftGatewayStore(BaseStore):
+    """Conservative LangGraph BaseStore adapter for keyed gateway threads.
 
-    def __init__(self, path):
+    Each (namespace, key) is mapped to a separate gateway thread.
+    The gateway's dominant-state recall is not a multi-record index.
+    """
+
+    def __init__(self, gateway_url="http://127.0.0.1:8000", client=None):
         super().__init__()
-        self.path = str(path)
-        with self._connect() as db:
-            db.execute(
-                "CREATE TABLE IF NOT EXISTS memories ("
-                "namespace TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, "
-                "created_at TEXT NOT NULL, updated_at TEXT NOT NULL, "
-                "PRIMARY KEY(namespace, key))"
-            )
+        self.gateway_url = gateway_url.rstrip("/")
+        self.client = client or httpx.Client(timeout=5.0)
 
-    def _connect(self):
-        return sqlite3.connect(self.path, timeout=10)
-
-    @staticmethod
-    def _namespace(value):
-        if not isinstance(value, tuple) or any(
-            not isinstance(part, str) or not part for part in value
-        ):
-            raise ValueError("namespace must be a tuple of nonempty strings")
-        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-
-    @staticmethod
-    def _item(row, search=False):
-        cls = SearchItem if search else Item
-        return cls(
-            namespace=tuple(json.loads(row[0])),
-            key=row[1],
-            value=json.loads(row[2]),
-            created_at=datetime.fromisoformat(row[3]),
-            updated_at=datetime.fromisoformat(row[4]),
-        )
+    def close(self):
+        self.client.close()
 
     def batch(self, ops):
         results = []
-        with self._connect() as db:
-            for op in ops:
-                if isinstance(op, GetOp):
-                    ns = self._namespace(op.namespace)
-                    row = db.execute(
-                        "SELECT namespace,key,value,created_at,updated_at "
-                        "FROM memories WHERE namespace=? AND key=?",
-                        (ns, op.key),
-                    ).fetchone()
-                    results.append(self._item(row) if row else None)
-                elif isinstance(op, PutOp):
-                    ns = self._namespace(op.namespace)
-                    if op.ttl not in (None,) and type(op.ttl).__name__ != "NotProvided":
-                        raise NotImplementedError("TTL is not supported")
-                    if op.value is None:
-                        db.execute(
-                            "DELETE FROM memories WHERE namespace=? AND key=?",
-                            (ns, op.key),
-                        )
-                    else:
-                        if not isinstance(op.value, dict):
-                            raise TypeError("value must be a dictionary")
-                        now = datetime.now(timezone.utc).isoformat()
-                        db.execute(
-                            "INSERT INTO memories VALUES (?,?,?,?,?) "
-                            "ON CONFLICT(namespace,key) DO UPDATE SET "
-                            "value=excluded.value,updated_at=excluded.updated_at",
-                            (ns, op.key, json.dumps(op.value), now, now),
-                        )
+        for op in ops:
+            if isinstance(op, GetOp):
+                thread_id = encode_namespace(op.namespace, op.key)
+                response = self.client.get(
+                    self.gateway_url + "/recall", params={"thread_id": thread_id}
+                )
+                response.raise_for_status()
+                text = response.json().get("recovered_text")
+                if not text:
                     results.append(None)
-                elif isinstance(op, SearchOp):
-                    if op.query is not None:
-                        raise NotImplementedError("semantic search is not supported")
-                    rows = db.execute(
-                        "SELECT namespace,key,value,created_at,updated_at "
-                        "FROM memories ORDER BY namespace,key"
-                    ).fetchall()
-                    matches = []
-                    for row in rows:
-                        namespace = tuple(json.loads(row[0]))
-                        value = json.loads(row[2])
-                        if namespace[: len(op.namespace_prefix)] != op.namespace_prefix:
-                            continue
-                        if op.filter and any(value.get(k) != v for k, v in op.filter.items()):
-                            continue
-                        matches.append(self._item(row, search=True))
-                    results.append(matches[op.offset : op.offset + op.limit])
-                elif isinstance(op, ListNamespacesOp):
-                    rows = db.execute("SELECT DISTINCT namespace FROM memories").fetchall()
-                    namespaces = set()
-                    for (encoded,) in rows:
-                        namespace = tuple(json.loads(encoded))
-                        if op.match_conditions:
-                            matched = True
-                            for condition in op.match_conditions:
-                                path = condition.path
-                                if condition.match_type == "prefix":
-                                    target = namespace[: len(path)]
-                                elif condition.match_type == "suffix":
-                                    target = namespace[-len(path) :]
-                                else:
-                                    raise ValueError("unknown match condition")
-                                if len(target) != len(path) or any(
-                                    p != "*" and p != v for p, v in zip(path, target)
-                                ):
-                                    matched = False
-                                    break
-                            if not matched:
-                                continue
-                        if op.max_depth is not None:
-                            namespace = namespace[: op.max_depth]
-                        namespaces.add(namespace)
-                    ordered = sorted(namespaces)
-                    results.append(ordered[op.offset : op.offset + op.limit])
-                else:
-                    raise TypeError("unsupported LangGraph store operation")
+                    continue
+                record = json.loads(text)
+                if not isinstance(record, dict) or record.get("key") != op.key:
+                    results.append(None)
+                    continue
+                value = record.get("value")
+                if not isinstance(value, dict):
+                    results.append(None)
+                    continue
+                now = datetime.now(timezone.utc)
+                results.append(
+                    Item(
+                        namespace=op.namespace,
+                        key=op.key,
+                        value=value,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
+            elif isinstance(op, PutOp):
+                if op.value is None:
+                    raise NotImplementedError(
+                        "Gateway does not expose keyed deletion"
+                    )
+                if not isinstance(op.value, dict):
+                    raise TypeError("value must be a dictionary")
+                if op.ttl is not None and type(op.ttl).__name__ != "NotProvided":
+                    raise NotImplementedError("Gateway does not support TTL")
+                thread_id = encode_namespace(op.namespace, op.key)
+                response = self.client.post(
+                    self.gateway_url + "/inject",
+                    params={"thread_id": thread_id},
+                    json={
+                        "text": json.dumps({"key": op.key, "value": op.value}),
+                        "salience": 1.0,
+                    },
+                )
+                response.raise_for_status()
+                results.append(None)
+            else:
+                raise NotImplementedError(
+                    "Gateway has no authoritative namespace enumeration or "
+                    "keyed multi-record search"
+                )
         return results
 
     async def abatch(self, ops):

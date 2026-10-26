@@ -187,6 +187,23 @@ struct MemoryRequest {
     limit: usize,
 }
 
+const FRAMEWORK_MEMORY_SNAPSHOT: &str = "framework_memory.nd";
+
+async fn load_identity_ledger() -> std::io::Result<IdentityLedger> {
+    match fs::read(FRAMEWORK_MEMORY_SNAPSHOT).await {
+        Ok(bytes) => postcard::from_bytes(&bytes).map_err(|error| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Cannot decode framework memory snapshot: {error}"),
+            )
+        }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok(IdentityLedger::default())
+        }
+        Err(error) => Err(error),
+    }
+}
+
 fn default_memory_limit() -> usize {
     100
 }
@@ -261,7 +278,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         projectors: RwLock::new(projectors),
         threads: cache,
         cleanup_threshold,
-        identity: RwLock::new(IdentityLedger::default()),
+        identity: RwLock::new(load_identity_ledger().await?),
     };
 
     let state = Arc::new(global_state);

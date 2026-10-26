@@ -9,6 +9,27 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
+
+
+def validate_local_url(base_url):
+    try:
+        parsed = urlsplit(base_url)
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Invalid gateway URL") from exc
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in ("127.0.0.1", "localhost", "::1")
+        or parsed.username is not None
+        or parsed.password is not None
+        or port is None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("Only loopback HTTP gateway URLs with an explicit port are supported")
+    return base_url
 
 
 def check_health(base_url):
@@ -24,8 +45,10 @@ def main():
     args = parser.parse_args()
     if args.wait_seconds < 0:
         parser.error("--wait-seconds must be nonnegative")
-    if not args.url.startswith(("http://127.0.0.1:", "http://localhost:", "http://[::1]:")):
-        parser.error("Only local loopback gateway URLs are supported")
+    try:
+        validate_local_url(args.url)
+    except ValueError as exc:
+        parser.error(str(exc))
     deadline = time.monotonic() + args.wait_seconds
     while True:
         try:

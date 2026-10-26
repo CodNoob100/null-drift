@@ -62,7 +62,7 @@ class RealLangGraphGatewayTests(unittest.TestCase):
             "namespaces": [["tenant", "agent"], ["tenant", "other"]]
         }
         store = NullDriftGatewayStore(client=client)
-        result = store.batch([ListNamespacesOp(prefix=("tenant",))])[0]
+        result = store.batch([ListNamespacesOp(match_conditions=())])[0]
         self.assertEqual(result, [("tenant", "agent"), ("tenant", "other")])
         self.assertEqual(
             client.post.call_args.kwargs["json"]["operation"], "namespaces"

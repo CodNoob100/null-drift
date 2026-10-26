@@ -53,6 +53,19 @@ class NamespaceEncodingTests(unittest.TestCase):
             encode_namespace(("team",), "second"),
         )
 
+    def test_namespace_only_and_keyed_identity_differ(self):
+        self.assertNotEqual(
+            encode_namespace(("team", "agent")),
+            encode_namespace(("team",), "agent"),
+        )
+
+    def test_long_namespaces_produce_bounded_stable_ids(self):
+        namespace = ("tenant-" + "x" * 2000, "agent")
+        first = encode_namespace(namespace, "key-" + "y" * 2000)
+        self.assertEqual(first, encode_namespace(namespace, "key-" + "y" * 2000))
+        self.assertEqual(len(first), 67)
+        self.assertTrue(first.startswith("lg_"))
+
     def test_rejects_empty_namespace(self):
         with self.assertRaises(ValueError):
             encode_namespace(())

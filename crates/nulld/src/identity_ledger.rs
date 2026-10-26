@@ -63,7 +63,10 @@ impl IdentityLedger {
         if position.is_none() && self.records.len() >= MAX_RECORDS {
             return Err(LedgerError::CapacityExceeded);
         }
-        self.revision = self.revision.checked_add(1).ok_or(LedgerError::CapacityExceeded)?;
+        self.revision = self
+            .revision
+            .checked_add(1)
+            .ok_or(LedgerError::CapacityExceeded)?;
         let record = MemoryRecord {
             namespace: namespace.to_vec(),
             key: key.to_owned(),
@@ -106,7 +109,11 @@ impl IdentityLedger {
             .cloned()
             .collect();
         found.sort_by(|a, b| (&a.namespace, &a.key).cmp(&(&b.namespace, &b.key)));
-        found.into_iter().skip(offset).take(limit.min(MAX_RECORDS)).collect()
+        found
+            .into_iter()
+            .skip(offset)
+            .take(limit.min(MAX_RECORDS))
+            .collect()
     }
 
     pub fn namespaces(&self, prefix: &[String]) -> Vec<Vec<String>> {
@@ -131,10 +138,18 @@ mod tests {
         let mut ledger = IdentityLedger::default();
         let a = vec!["tenant".into(), "agent".into()];
         let b = vec!["tenant".into(), "other".into()];
-        ledger.put(&a, "first", serde_json::json!({"v": 1})).unwrap();
-        ledger.put(&a, "second", serde_json::json!({"v": 2})).unwrap();
-        ledger.put(&b, "first", serde_json::json!({"v": 3})).unwrap();
-        ledger.put(&a, "first", serde_json::json!({"v": 4})).unwrap();
+        ledger
+            .put(&a, "first", serde_json::json!({"v": 1}))
+            .unwrap();
+        ledger
+            .put(&a, "second", serde_json::json!({"v": 2}))
+            .unwrap();
+        ledger
+            .put(&b, "first", serde_json::json!({"v": 3}))
+            .unwrap();
+        ledger
+            .put(&a, "first", serde_json::json!({"v": 4}))
+            .unwrap();
         assert_eq!(serde_json::from_str::<serde_json::Value>(&ledger.get(&a, "first").unwrap().value).unwrap()["v"], 4);
         assert_eq!(ledger.search(&["tenant".into()], 1, 1).len(), 1);
         assert_eq!(ledger.namespaces(&["tenant".into()]).len(), 2);

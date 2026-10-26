@@ -45,6 +45,12 @@ class NamespaceEncodingTests(unittest.TestCase):
             encode_namespace(("a_b", "c")), encode_namespace(("a", "b_c"))
         )
 
+    def test_keys_are_isolated(self):
+        self.assertNotEqual(
+            encode_namespace(("team",), "first"),
+            encode_namespace(("team",), "second"),
+        )
+
     def test_rejects_empty_namespace(self):
         with self.assertRaises(ValueError):
             encode_namespace(())
@@ -59,7 +65,7 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
             args, kwargs = storage.client.post.call_args
             self.assertTrue(args[0].endswith("/inject"))
             self.assertEqual(
-                kwargs["params"], {"thread_id": encode_namespace(("team", "agent"))}
+                kwargs["params"], {"thread_id": encode_namespace(("team", "agent"), "key-1")}
             )
             self.assertIn('"key": "key-1"', kwargs["json"]["text"])
         finally:
@@ -74,7 +80,7 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(await storage.aget(("team",), "wanted"))
             self.assertEqual(
                 storage.client.get.call_args.kwargs["params"],
-                {"thread_id": encode_namespace(("team",))},
+                {"thread_id": encode_namespace(("team",), "wanted")},
             )
         finally:
             await storage.client.aclose()

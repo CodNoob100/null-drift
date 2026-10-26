@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Documentation
+
+- Add a source-verified configuration table for daemon and gateway environment defaults and explain Docker Compose overrides and network exposure boundaries; do not advertise draft quota settings as deployed.
+
 ### Fixed
 
 - Refuse to silently initialize an empty thread when a persisted checkpoint exists but is corrupt or unreadable. Only a missing snapshot creates a new state; return an explicit error and preserve the existing bytes. Add valid/corrupt/missing checkpoint regression tests.

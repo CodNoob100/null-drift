@@ -14,26 +14,13 @@ docker compose -f docker/docker-compose.yml ps
 curl -fsS http://127.0.0.1:8000/health
 ```
 
-If the first health request fails while the embedding model is initializing, wait for readiness instead of repeatedly restarting containers (POSIX shell; up to about 3 minutes):
+If the first health request fails while the model initializes, use the bounded, configurable Python 3 standard-library readiness probe (up to 180 seconds by default):
 
 ```sh
-ready=0
-for attempt in $(seq 1 36); do
-  if curl --fail --silent --show-error --max-time 3 http://127.0.0.1:8000/health; then
-    ready=1
-    break
-  fi
-  sleep 5
-done
-if [ "$ready" -ne 1 ]; then
-  echo 'Gateway did not become healthy; inspect Compose logs' >&2
-  docker compose -f docker/docker-compose.yml ps
-  docker compose -f docker/docker-compose.yml logs --tail=100 gateway nulld
-  exit 1
-fi
+python3 scripts/check_gateway_health.py --url http://127.0.0.1:8000 --wait-seconds 180
 ```
 
-This timeout is illustrative; first-time model downloads can take longer. A failed readiness check is a diagnostic, not proof of a permanently broken installation.
+If it times out, inspect `docker compose -f docker/docker-compose.yml ps` and `docker compose -f docker/docker-compose.yml logs --tail=100 gateway nulld`. Initial model downloads can exceed this window; a timeout is diagnostic, not proof of permanent failure.
 
 **Expected health response once both services are ready:** `{"status":"ok"}`. Model initialization may take time on first startup; if health is unavailable, inspect logs instead of assuming success:
 
@@ -42,8 +29,6 @@ docker compose -f docker/docker-compose.yml logs --tail=100 gateway nulld
 ```
 
 Check the gateway's response with the example requests below. A successful HTTP response verifies reachability and basic API wiring, but does not establish exact recall or checkpoint durability.
-
-For a small Python 3 standard-library health probe after startup, run `python3 scripts/check_gateway_health.py`. This checks only localhost gateway readiness; it does not verify model quality, persistence, or framework integration.
 
 Try an inject and recall:
 

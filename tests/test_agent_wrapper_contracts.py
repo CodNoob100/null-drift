@@ -6,7 +6,11 @@ These do not establish compatibility with upstream LangGraph or CrewAI interface
 import unittest
 from unittest.mock import AsyncMock, Mock
 
-from nulldrift_agents import NullDriftCrewStorage, NullDriftLangGraphStore
+from nulldrift_agents import (
+    NullDriftCrewStorage,
+    NullDriftLangGraphStore,
+    encode_namespace,
+)
 
 
 class CrewStorageTests(unittest.TestCase):
@@ -35,6 +39,17 @@ class CrewStorageTests(unittest.TestCase):
             storage.client.close()
 
 
+class NamespaceEncodingTests(unittest.TestCase):
+    def test_tuple_boundaries_are_distinct(self):
+        self.assertNotEqual(
+            encode_namespace(("a_b", "c")), encode_namespace(("a", "b_c"))
+        )
+
+    def test_rejects_empty_namespace(self):
+        with self.assertRaises(ValueError):
+            encode_namespace(())
+
+
 class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
     async def test_put_routes_namespace_and_key(self):
         storage = NullDriftLangGraphStore()
@@ -43,7 +58,9 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
             await storage.aput(("team", "agent"), "key-1", {"value": 1})
             args, kwargs = storage.client.post.call_args
             self.assertTrue(args[0].endswith("/inject"))
-            self.assertEqual(kwargs["params"], {"thread_id": "team_agent"})
+            self.assertEqual(
+                kwargs["params"], {"thread_id": encode_namespace(("team", "agent"))}
+            )
             self.assertIn('"key": "key-1"', kwargs["json"]["text"])
         finally:
             await storage.client.aclose()
@@ -55,6 +72,10 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
             response = Mock(json=lambda: {"recovered_text": recovered})
             storage.client.get = AsyncMock(return_value=response)
             self.assertIsNone(await storage.aget(("team",), "wanted"))
+            self.assertEqual(
+                storage.client.get.call_args.kwargs["params"],
+                {"thread_id": encode_namespace(("team",))},
+            )
         finally:
             await storage.client.aclose()
 

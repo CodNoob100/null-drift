@@ -67,3 +67,40 @@ approximate attractor is a lossless dictionary.
 
 Research/design only. Native ledger, deletion, namespace APIs, and durability
 tests remain unimplemented; do not count this document as contract completion.
+
+## Research adoption audit (26 October 2026)
+
+This is an implementation audit, not a benchmark or a claim that the
+papers' algorithms have been reproduced.
+
+| Publication | Adoption | Evidence | Missing implementation |
+| --- | --- | --- | --- |
+| Key-value memory in the brain (Neuron, 2025) | **Partial** | Native `IdentityLedger` separates namespace/key identity from AMN/HRSA; gateway thread encoding also separates keys | Wire ledger to daemon and native snapshot; distinguish keys/values in actual neural learning |
+| HeLa-Mem (ACL 2026) | **Conceptual only** | Existing AMN attractors offer associative recall, but no demonstrated HeLa-Mem-style graph | Hebbian edge updates, episodic graph, semantic distillation, spreading activation |
+| RippleMem (arXiv, August 2026) | **Conceptual only** | No hybrid cue indexing or anchor-local expansion in current code | Cue-rich episodes, typed semantic/structural edges, bounded adaptive expansion |
+| Autonomous retrieval (Frontiers in Computational Neuroscience, 2025) | **Not implemented** | Existing HRSA has attractor dynamics, not demonstrated inhibitory replay | Local inhibitory plasticity, autonomous attractor traversal, replay/consolidation evaluation |
+
+Do not assign numerical paper-adoption percentages: conceptual inspiration
+is not a meaningful fraction of a reproduced research method. For each
+algorithm, promote adoption status only after a code path, reproducible
+test, and benchmark or ablation evidence exist.
+
+### Concrete next experiments
+
+1. Add a **bounded activation graph** whose nodes reference native
+   `MemoryRecord` identities and whose edges strengthen after co-recall.
+   Compare multi-hop evidence recall against HRSA-only retrieval.
+2. Add a **cue-rich episode record** (participants, location, time,
+   lexical cues), and test bounded anchor-local expansion with and without
+   structural cues.
+3. Prototype **rehearsal with inhibitory suppression** in a research
+   module, measure catastrophic forgetting and spurious attractors, and
+   keep it out of production until behavior is validated.
+4. Test native identity ledger recovery, tombstones, and namespace
+   pagination separately from approximate recall quality.
+
+Research sources:
+- https://www.sciencedirect.com/science/article/pii/S0896627325001722
+- https://aclanthology.org/2026.acl-long.625/
+- https://arxiv.org/abs/2608.13334
+- https://pmc.ncbi.nlm.nih.gov/articles/PMC12418250/

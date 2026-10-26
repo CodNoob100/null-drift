@@ -1,0 +1,23 @@
+name: Docker Gateway Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docker/**"
+      - "scripts/docker_smoke.sh"
+      - "scripts/check_gateway_health.py"
+      - ".github/workflows/docker-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and exercise Docker Compose gateway
+        run: bash scripts/docker_smoke.sh

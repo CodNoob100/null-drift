@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import Mock
 
 try:
-    from langgraph.store.base import BaseStore, GetOp, PutOp, SearchOp
+    from langgraph.store.base import BaseStore, GetOp, ListNamespacesOp, PutOp, SearchOp
     from nulldrift_langgraph_sqlite import NullDriftGatewayStore
 except ImportError:
     BaseStore = None
@@ -55,6 +55,20 @@ class RealLangGraphGatewayTests(unittest.TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].value, {"v": 7})
         self.assertEqual(client.post.call_args.kwargs["json"]["operation"], "search")
+
+    def test_list_namespaces(self):
+        client = Mock()
+        client.post.return_value.json.return_value = {
+            "namespaces": [["tenant", "agent"], ["tenant", "other"]]
+        }
+        store = NullDriftGatewayStore(client=client)
+        result = store.batch([ListNamespacesOp(prefix=("tenant",))])[0]
+        self.assertEqual(
+            result, [("tenant", "agent"), ("tenant", "other")]
+        )
+        self.assertEqual(
+            client.post.call_args.kwargs["json"]["operation"], "namespaces"
+        )
 
     def test_unsupported_operations_are_not_silent(self):
         store = NullDriftGatewayStore(client=Mock())

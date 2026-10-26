@@ -15,7 +15,7 @@ pub struct MemoryRecord {
     pub revision: u64,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct IdentityLedger {
     revision: u64,
     records: Vec<MemoryRecord>,

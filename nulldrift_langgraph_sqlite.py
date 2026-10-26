@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timezone
 
 import httpx
-from langgraph.store.base import BaseStore, GetOp, Item, PutOp, SearchOp
+from langgraph.store.base import BaseStore, GetOp, Item, ListNamespacesOp, PutOp, SearchOp
 
 from nulldrift_agents import encode_namespace
 
@@ -86,6 +86,16 @@ class NullDriftGatewayStore(BaseStore):
                         )
                         for record in payload["records"]
                     ]
+                )
+            elif isinstance(op, ListNamespacesOp):
+                if op.max_depth is not None or op.suffix is not None:
+                    raise NotImplementedError(
+                        "Namespace depth and suffix filtering are not supported"
+                    )
+                prefix = op.prefix or ()
+                payload = self._memory("namespaces", prefix)
+                results.append(
+                    [tuple(namespace) for namespace in payload["namespaces"]]
                 )
             else:
                 raise NotImplementedError("Unsupported LangGraph operation")

@@ -169,6 +169,35 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_recovery_preserves_overwrites_and_deletions() {
+        let mut ledger = IdentityLedger::default();
+        let namespace = vec!["tenant".into(), "agent".into()];
+        ledger.put(&namespace, "a", serde_json::json!({"v": 1})).unwrap();
+        ledger.put(&namespace, "b", serde_json::json!({"v": 2})).unwrap();
+        ledger.put(&namespace, "a", serde_json::json!({"v": 3})).unwrap();
+        assert!(ledger.delete(&namespace, "b").unwrap());
+        let snapshot = postcard::to_stdvec(&ledger).unwrap();
+        let recovered: IdentityLedger = postcard::from_bytes(&snapshot).unwrap();
+        assert!(recovered.get(&namespace, "b").is_none());
+        assert_eq!(recovered.search(&namespace, 0, 10).len(), 1);
+        assert!(recovered.get(&namespace, "a").unwrap().value.contains("3"));
+    }
+
+    #[test]
+    fn namespace_prefix_isolation_and_stable_order() {
+        let mut ledger = IdentityLedger::default();
+        let a = vec!["tenant-a".into()];
+        let b = vec!["tenant-b".into()];
+        ledger.put(&a, "z", serde_json::json!({})).unwrap();
+        ledger.put(&a, "a", serde_json::json!({})).unwrap();
+        ledger.put(&b, "a", serde_json::json!({})).unwrap();
+        assert_eq!(ledger.search(&a, 0, 1)[0].key, "a");
+        assert_eq!(ledger.search(&a, 1, 1)[0].key, "z");
+        assert_eq!(ledger.search(&a, 2, 1).len(), 0);
+        assert_eq!(ledger.namespaces(&a), vec![a]);
+    }
+
+    #[test]
     fn rejects_invalid_and_oversized_payloads() {
         let mut ledger = IdentityLedger::default();
         assert_eq!(ledger.put(&[], "x", serde_json::json!({})), Err(LedgerError::InvalidIdentity));

@@ -14,6 +14,27 @@ docker compose -f docker/docker-compose.yml ps
 curl -fsS http://127.0.0.1:8000/health
 ```
 
+If the first health request fails while the embedding model is initializing, wait for readiness instead of repeatedly restarting containers (POSIX shell; up to about 3 minutes):
+
+```sh
+ready=0
+for attempt in $(seq 1 36); do
+  if curl --fail --silent --show-error --max-time 3 http://127.0.0.1:8000/health; then
+    ready=1
+    break
+  fi
+  sleep 5
+done
+if [ "$ready" -ne 1 ]; then
+  echo 'Gateway did not become healthy; inspect Compose logs' >&2
+  docker compose -f docker/docker-compose.yml ps
+  docker compose -f docker/docker-compose.yml logs --tail=100 gateway nulld
+  exit 1
+fi
+```
+
+This timeout is illustrative; first-time model downloads can take longer. A failed readiness check is a diagnostic, not proof of a permanently broken installation.
+
 **Expected health response once both services are ready:** `{"status":"ok"}`. Model initialization may take time on first startup; if health is unavailable, inspect logs instead of assuming success:
 
 ```sh
@@ -49,7 +70,7 @@ docker compose -f docker/docker-compose.yml down
 
 **Prerequisites:** Rust toolchain with Cargo, Python for lint/tests, and optionally Docker for full-stack testing. The current CI uses Rust nightly, `cargo fmt --check`, `cargo clippy --workspace --lib --bins -- -D warnings`, and `cargo test --workspace --lib --bins`.
 
-From repository root, run the **offline Rust checks** (no model download or running gateway required):
+From repository root, run the **service-independent Rust checks** (no running gateway or FastEmbed model initialization required). Cargo may still fetch Rust dependencies/toolchains on first use; these commands are not guaranteed to work without internet:
 
 ```sh
 cargo +nightly fmt --check
@@ -66,7 +87,7 @@ For manual service inspection, source entry points are:
 - `crates/null-drift-core/src/`: projection, HRSA and attractor implementation.
 - `nulldrift_agents.py`: prototype Python adapters, **not** verified drop-in framework integrations.
 
-To manually run both Rust services, use **separate terminals**, choose a private working directory for daemon checkpoint files, and explicitly set bind/network variables. Example on a trusted local development machine:
+To manually run both Rust services, use **separate terminals**, choose a private working directory for daemon checkpoint files, and explicitly set bind/network variables. Unlike Docker Compose, manual startup does not provide service orchestration or automatic restarts. Example on a trusted local development machine:
 
 ```sh
 # Terminal 1, repository root (writes checkpoint files in current working directory)
@@ -74,6 +95,8 @@ HOST=127.0.0.1 PORT=3000 cargo run -p nulld
 # Terminal 2, repository root
 HOST=127.0.0.1 PORT=8000 NULLD_URL=http://127.0.0.1:3000 cargo run -p gateway-rs
 ```
+
+After the gateway starts, check `curl -fsS http://127.0.0.1:8000/health` before sending writes. Stop each process with Ctrl-C; unlike the Compose named volume, manually created checkpoints remain in the daemon process's working directory.
 
 These source-run commands are guidance, not a verified end-to-end smoke test; the gateway may download an embedding model. Inspect `Cargo.toml` workspace/package names if commands differ on your branch. The daemon checkpoint location depends on its process working directory, so do not run it from a directory containing valuable similarly named state files.
 

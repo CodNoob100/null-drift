@@ -150,7 +150,8 @@ class NullDriftLangGraphStore(BaseStore):
             if data.get("recovered_text"):
                 parsed = json.loads(data["recovered_text"])
                 if isinstance(parsed, dict) and parsed.get("key") == key:
-                    return parsed.get("value")
+                    value = parsed.get("value")
+                    return value if isinstance(value, dict) else None
         except httpx.RequestError:
             logging.exception("NullDrift LangGraph async get failed")
             raise

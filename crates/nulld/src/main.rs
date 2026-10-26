@@ -197,9 +197,7 @@ async fn load_identity_ledger() -> std::io::Result<IdentityLedger> {
                 format!("Cannot decode framework memory snapshot: {error}"),
             )
         }),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            Ok(IdentityLedger::default())
-        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(IdentityLedger::default()),
         Err(error) => Err(error),
     }
 }
@@ -231,8 +229,12 @@ async fn handle_memory(
         "delete" => staged
             .delete(&request.namespace, &request.key)
             .map(|deleted| serde_json::json!({"deleted": deleted})),
-        "search" => Ok(serde_json::json!({"records": ledger.search(&request.namespace, request.offset, request.limit)})),
-        "namespaces" => Ok(serde_json::json!({"namespaces": ledger.namespaces(&request.namespace)})),
+        "search" => Ok(
+            serde_json::json!({"records": ledger.search(&request.namespace, request.offset, request.limit)}),
+        ),
+        "namespaces" => {
+            Ok(serde_json::json!({"namespaces": ledger.namespaces(&request.namespace)}))
+        }
         _ => {
             return (
                 StatusCode::BAD_REQUEST,

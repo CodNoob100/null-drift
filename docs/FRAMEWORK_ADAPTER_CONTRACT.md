@@ -12,8 +12,12 @@ operations and keyed `get`/`put`/`delete`, namespace listing, and
 prefix-scoped search. `get` returns an `Item` with metadata, not a bare
 dictionary. The present `NullDriftLangGraphStore.aget` returns a dictionary,
 and `aput` stores a single `{"key": ..., "value": ...}` payload under
-`"_".join(namespace)`. Distinct namespace tuples can collide:
-`("a_b", "c")` and `("a", "b_c")` both map to `a_b_c`.
+a deterministic SHA-256-derived thread ID for the namespace and key. This
+separates namespace-only and keyed identities and bounds identifier length.
+
+Namespace-only snapshot/restore uses a different thread ID from keyed writes;
+these methods do **not** currently snapshot the keyed records. Do not depend
+on them for keyed persistence.
 
 The gateway's dominant-state recall is not a durable multi-key index. An
 upstream-compatible adapter must use a separate authoritative keyed backend

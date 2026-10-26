@@ -43,6 +43,8 @@ docker compose -f docker/docker-compose.yml logs --tail=100 gateway nulld
 
 Check the gateway's response with the example requests below. A successful HTTP response verifies reachability and basic API wiring, but does not establish exact recall or checkpoint durability.
 
+For a small Python 3 standard-library health probe after startup, run `python3 scripts/check_gateway_health.py`. This checks only localhost gateway readiness; it does not verify model quality, persistence, or framework integration.
+
 Try an inject and recall:
 
 ```sh

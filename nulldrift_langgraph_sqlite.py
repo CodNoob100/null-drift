@@ -65,7 +65,9 @@ class NullDriftGatewayStore(BaseStore):
                 results.append(None)
             elif isinstance(op, SearchOp):
                 if op.query is not None or op.filter is not None:
-                    raise NotImplementedError("Semantic search and filters are not supported")
+                    raise NotImplementedError(
+                        "Semantic search and filters are not supported"
+                    )
                 payload = self._memory(
                     "search",
                     op.namespace_prefix,

@@ -1,65 +1,49 @@
-"""Tests against the installed real LangGraph BaseStore protocol."""
+"""Actual LangGraph operation types against the null-drift gateway boundary."""
 
 import asyncio
-import tempfile
+import json
 import unittest
-from pathlib import Path
+from unittest.mock import Mock
 
 try:
-    from langgraph.store.base import BaseStore, GetOp, ListNamespacesOp, PutOp, SearchOp
+    from langgraph.store.base import BaseStore, GetOp, PutOp, SearchOp
     from nulldrift_langgraph_sqlite import NullDriftGatewayStore
 except ImportError:
     BaseStore = None
 
 
 @unittest.skipIf(BaseStore is None, "langgraph-checkpoint is not installed")
-class RealLangGraphStoreTests(unittest.TestCase):
-    @unittest.skip("Gateway-only adapter does not promise exact multi-key persistence")
-    def test_multi_key_overwrite_delete_and_restart(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "memories.db"
-            store = NullDriftGatewayStore()
-            self.assertIsInstance(store, BaseStore)
-            store.put(("tenant", "agent"), "first", {"v": 1})
-            store.put(("tenant", "agent"), "second", {"v": 2})
-            store.put(("tenant", "other"), "first", {"v": 3})
-            store.put(("tenant", "agent"), "first", {"v": 4})
-            reopened = NullDriftGatewayStore()
-            self.assertEqual(reopened.get(("tenant", "agent"), "first").value, {"v": 4})
-            self.assertEqual(reopened.get(("tenant", "agent"), "second").value, {"v": 2})
-            self.assertEqual(reopened.get(("tenant", "other"), "first").value, {"v": 3})
-            reopened.delete(("tenant", "agent"), "first")
-            self.assertIsNone(reopened.get(("tenant", "agent"), "first"))
-            self.assertEqual(reopened.get(("tenant", "agent"), "second").value, {"v": 2})
+class RealLangGraphGatewayTests(unittest.TestCase):
+    def test_keyed_put_get_use_identical_thread(self):
+        client = Mock()
+        client.get.return_value.json.return_value = {
+            "recovered_text": json.dumps({"key": "first", "value": {"v": 1}})
+        }
+        store = NullDriftGatewayStore(client=client)
+        self.assertIsInstance(store, BaseStore)
+        store.put(("tenant", "agent"), "first", {"v": 1})
+        self.assertEqual(store.get(("tenant", "agent"), "first").value, {"v": 1})
+        self.assertEqual(
+            client.post.call_args.kwargs["params"]["thread_id"],
+            client.get.call_args.kwargs["params"]["thread_id"],
+        )
 
-    @unittest.skip("Gateway does not expose namespace enumeration")
-    def test_batch_search_namespace_and_async(self):
-        with tempfile.TemporaryDirectory() as directory:
-            store = NullDriftGatewayStore()
-            result = store.batch(
-                [
-                    PutOp(("tenant", "a"), "one", {"kind": "note"}),
-                    PutOp(("tenant", "b"), "two", {"kind": "other"}),
-                    GetOp(("tenant", "a"), "one"),
-                    SearchOp(("tenant",), filter={"kind": "note"}),
-                    ListNamespacesOp(),
-                ]
-            )
-            self.assertIsNone(result[0])
-            self.assertIsNone(result[1])
-            self.assertEqual(result[2].value, {"kind": "note"})
-            self.assertEqual([item.key for item in result[3]], ["one"])
-            self.assertEqual(result[4], [("tenant", "a"), ("tenant", "b")])
-            async_result = asyncio.run(
-                store.abatch([GetOp(("tenant", "b"), "two")])
-            )
-            self.assertEqual(async_result[0].value, {"kind": "other"})
+    def test_missing_record_and_async_batch(self):
+        client = Mock()
+        client.get.return_value.json.return_value = {}
+        store = NullDriftGatewayStore(client=client)
+        self.assertIsNone(store.get(("tenant",), "missing"))
+        self.assertEqual(
+            asyncio.run(store.abatch([GetOp(("tenant",), "missing")])),
+            [None],
+        )
 
-    def test_unsupported_semantic_query_fails_explicitly(self):
-        with tempfile.TemporaryDirectory() as directory:
-            store = NullDriftSQLiteStore(Path(directory) / "store.db")
-            with self.assertRaises(NotImplementedError):
-                store.batch([SearchOp(("tenant",), query="similar text")])
+    def test_unsupported_operations_are_not_silent(self):
+        store = NullDriftGatewayStore(client=Mock())
+        with self.assertRaises(NotImplementedError):
+            store.batch([SearchOp(("tenant",))])
+        with self.assertRaises(NotImplementedError):
+            store.batch([PutOp(("tenant",), "key", None)])
 
 
 if __name__ == "__main__":

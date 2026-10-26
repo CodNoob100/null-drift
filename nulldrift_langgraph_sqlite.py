@@ -18,7 +18,6 @@ from langgraph.store.base import (
     SearchOp,
 )
 
-from nulldrift_agents import encode_namespace
 
 
 class NullDriftGatewayStore(BaseStore):

@@ -126,11 +126,7 @@ class NullDriftLangGraphStore(BaseStore):
         data = {"text": text_payload, "salience": 1.0}
 
         if self.embedding_function:
-            try:
-                data["embedding"] = self.embedding_function(text_payload)
-            except Exception as e:
-                logging.error(f"Failed to generate embedding locally: {e}")
-                return
+            data["embedding"] = self.embedding_function(text_payload)
 
         try:
             res = await self.client.post(

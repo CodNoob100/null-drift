@@ -11,7 +11,7 @@ const MAX_VALUE_BYTES: usize = 64 * 1024;
 pub struct MemoryRecord {
     pub namespace: Vec<String>,
     pub key: String,
-    pub value: serde_json::Value,
+    pub value: String,
     pub revision: u64,
 }
 
@@ -67,7 +67,7 @@ impl IdentityLedger {
         let record = MemoryRecord {
             namespace: namespace.to_vec(),
             key: key.to_owned(),
-            value,
+            value: serde_json::to_string(&value).map_err(|_| LedgerError::InvalidValue)?,
             revision: self.revision,
         };
         if let Some(index) = position {
@@ -135,12 +135,12 @@ mod tests {
         ledger.put(&a, "second", serde_json::json!({"v": 2})).unwrap();
         ledger.put(&b, "first", serde_json::json!({"v": 3})).unwrap();
         ledger.put(&a, "first", serde_json::json!({"v": 4})).unwrap();
-        assert_eq!(ledger.get(&a, "first").unwrap().value["v"], 4);
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&ledger.get(&a, "first").unwrap().value).unwrap()["v"], 4);
         assert_eq!(ledger.search(&["tenant".into()], 1, 1).len(), 1);
         assert_eq!(ledger.namespaces(&["tenant".into()]).len(), 2);
         assert!(ledger.delete(&a, "first").unwrap());
         assert!(ledger.get(&a, "first").is_none());
-        assert_eq!(ledger.get(&a, "second").unwrap().value["v"], 2);
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&ledger.get(&a, "second").unwrap().value).unwrap()["v"], 2);
     }
 
     #[test]
@@ -150,7 +150,7 @@ mod tests {
         ledger.put(&namespace, "key", serde_json::json!({"text": "hello"})).unwrap();
         let bytes = postcard::to_stdvec(&ledger).unwrap();
         let restored: IdentityLedger = postcard::from_bytes(&bytes).unwrap();
-        assert_eq!(restored.get(&namespace, "key").unwrap().value["text"], "hello");
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&restored.get(&namespace, "key").unwrap().value).unwrap()["text"], "hello");
     }
 
     #[test]

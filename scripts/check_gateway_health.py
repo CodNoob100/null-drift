@@ -32,8 +32,15 @@ def validate_local_url(base_url):
     return base_url
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def check_health(base_url):
-    with urllib.request.urlopen(base_url.rstrip("/") + "/health", timeout=5) as response:
+    validate_local_url(base_url)
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    with opener.open(base_url.rstrip("/") + "/health", timeout=5) as response:
         payload = json.load(response)
     return isinstance(payload, dict) and payload.get("status") == "ok"
 

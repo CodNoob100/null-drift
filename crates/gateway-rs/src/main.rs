@@ -85,6 +85,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/recall", get(recall_state))
         .route("/snapshot", post(snapshot_state))
         .route("/restore", post(restore_state))
+        .route("/memory", post(memory_state))
         .with_state(state);
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8000".to_string());
@@ -228,5 +229,22 @@ async fn restore_state(
         .map_err(|e| (StatusCode::BAD_GATEWAY, e.to_string()))?;
     let status = res.status();
     let body = res.text().await.unwrap_or_default();
+    Ok(build_json_response(status, body))
+}
+
+async fn memory_state(
+    State(state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Response, (StatusCode, String)> {
+    let url = format!("{}/memory", state.nulld_url);
+    let response = state
+        .client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|error| (StatusCode::BAD_GATEWAY, error.to_string()))?;
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
     Ok(build_json_response(status, body))
 }

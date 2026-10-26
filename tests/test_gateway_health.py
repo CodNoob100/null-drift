@@ -1,4 +1,5 @@
 """Offline unit tests for the standard-library gateway readiness probe."""
+
 import io
 import json
 import unittest
@@ -46,10 +47,8 @@ class GatewayHealthTests(unittest.TestCase):
                 validate_local_url(url)
 
     def test_transport_failure(self):
-        with patch(
-            "scripts.check_gateway_health.urllib.request.build_opener",
-            **{"return_value.open.side_effect": URLError("offline")},
-        ):
+        with patch("scripts.check_gateway_health.urllib.request.build_opener") as mock:
+            mock.return_value.open.side_effect = URLError("offline")
             with self.assertRaises(URLError):
                 check_health("http://127.0.0.1:8000")
 

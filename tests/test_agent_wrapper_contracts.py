@@ -6,6 +6,8 @@ These do not establish compatibility with upstream LangGraph or CrewAI interface
 import unittest
 from unittest.mock import AsyncMock, Mock
 
+import httpx
+
 from nulldrift_agents import (
     NullDriftCrewStorage,
     NullDriftLangGraphStore,
@@ -87,6 +89,28 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
                 storage.client.post.call_args.kwargs["params"],
                 storage.client.get.call_args.kwargs["params"],
             )
+        finally:
+            await storage.client.aclose()
+
+    async def test_put_propagates_transport_failure(self):
+        storage = NullDriftLangGraphStore()
+        try:
+            storage.client.post = AsyncMock(
+                side_effect=httpx.ConnectError("gateway offline")
+            )
+            with self.assertRaises(httpx.ConnectError):
+                await storage.aput(("team",), "key-1", {"value": 1})
+        finally:
+            await storage.client.aclose()
+
+    async def test_get_propagates_transport_failure(self):
+        storage = NullDriftLangGraphStore()
+        try:
+            storage.client.get = AsyncMock(
+                side_effect=httpx.ConnectError("gateway offline")
+            )
+            with self.assertRaises(httpx.ConnectError):
+                await storage.aget(("team",), "key-1")
         finally:
             await storage.client.aclose()
 

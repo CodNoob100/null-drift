@@ -88,11 +88,11 @@ class NullDriftGatewayStore(BaseStore):
                     ]
                 )
             elif isinstance(op, ListNamespacesOp):
-                if op.max_depth is not None or op.suffix is not None:
+                if op.max_depth is not None or op.match_conditions:
                     raise NotImplementedError(
                         "Namespace depth and suffix filtering are not supported"
                     )
-                prefix = op.prefix or ()
+                prefix = ()
                 payload = self._memory("namespaces", prefix)
                 results.append(
                     [tuple(namespace) for namespace in payload["namespaces"]]

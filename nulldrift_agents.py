@@ -7,7 +7,9 @@ from typing import Any, Callable, Dict, List, Optional
 
 def encode_namespace(namespace: tuple[str, ...], key: Optional[str] = None) -> str:
     """Encode tuple boundaries unambiguously for gateway thread isolation."""
-    if not namespace or any(not isinstance(part, str) or not part for part in namespace):
+    if not isinstance(namespace, tuple) or not namespace or any(
+        not isinstance(part, str) or not part for part in namespace
+    ):
         raise ValueError("namespace must contain nonempty strings")
     if key is not None and (not isinstance(key, str) or not key):
         raise ValueError("key must be a nonempty string")

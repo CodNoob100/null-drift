@@ -15,7 +15,7 @@ class GatewayHealthTests(unittest.TestCase):
                 json.dumps({"status": "ok"}).encode("utf-8")
             )
             self.assertTrue(check_health("http://127.0.0.1:8000/"))
-            self.assertEqual(open_url.call_args.args[0], "http://127.0.0.1:8000/health")
+            self.assertEqual(\n                open_url.call_args.args[0], "http://127.0.0.1:8000/health"\n            )
 
     def test_unavailable_status(self):
         with patch("scripts.check_gateway_health.urllib.request.urlopen") as open_url:
@@ -25,7 +25,7 @@ class GatewayHealthTests(unittest.TestCase):
             self.assertFalse(check_health("http://127.0.0.1:8000"))
 
     def test_transport_failure(self):
-        with patch("scripts.check_gateway_health.urllib.request.urlopen", side_effect=URLError("offline")):
+        with patch(\n            "scripts.check_gateway_health.urllib.request.urlopen",\n            side_effect=URLError("offline"),\n        ):
             with self.assertRaises(URLError):
                 check_health("http://127.0.0.1:8000")
 

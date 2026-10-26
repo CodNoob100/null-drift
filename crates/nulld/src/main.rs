@@ -1,3 +1,5 @@
+mod identity_ledger;
+
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Query, State},

@@ -41,6 +41,23 @@ curl -fsS -X POST "http://127.0.0.1:8000/restore?thread_id=demo_1"
 
 **Security:** Thread IDs select state; they are **not authentication or tenant authorization**. Neither service currently implements built-in caller authentication. Keep the services on trusted networks and put authentication, authorization, TLS and request limiting at a deployment boundary before allowing untrusted callers. Do not publicly expose the daemon. See the [source](crates/nulld/src/main.rs), [Compose binding](docker/docker-compose.yml), and [security policy](docs/SECURITY.md).
 
+## Configuration
+
+The Rust services read these environment variables when started directly. Defaults below are from the current `main` sources, not a promise of network isolation.
+
+| Service | Variable | Default | Purpose |
+| --- | --- | --- | --- |
+| Daemon (`nulld`) | `HOST` | `0.0.0.0` | Bind address for the daemon HTTP listener. |
+| Daemon (`nulld`) | `PORT` | `3000` | Daemon HTTP listener port. |
+| Daemon (`nulld`) | `CLEANUP_THRESHOLD` | `3000` | Maximum Hamming mismatches allowed when selecting an attractor on recall. |
+| Gateway (`gateway-rs`) | `HOST` | `0.0.0.0` | Bind address for the gateway HTTP listener. |
+| Gateway (`gateway-rs`) | `PORT` | `8000` | Gateway HTTP listener port. |
+| Gateway (`gateway-rs`) | `NULLD_URL` | `http://127.0.0.1:3000` | Base URL used by the gateway to contact the daemon. |
+
+The provided [Compose configuration](docker/docker-compose.yml) overrides gateway `NULLD_URL` to `http://nulld:3000` (the Docker service name) and publishes **only the gateway** at host `127.0.0.1:8000`. The services' own `HOST=0.0.0.0` defaults bind to all interfaces *inside their respective network namespaces*; a direct process launch or a changed port mapping can expose a service more broadly. These settings provide **no authentication or tenant authorization**. Restrict network access and enforce caller identity and authorization at the deployment boundary before allowing untrusted clients.
+
+Sources: [daemon startup and recall](crates/nulld/src/main.rs), [gateway startup](crates/gateway-rs/src/main.rs), [Compose file](docker/docker-compose.yml), and [security guidance](docs/SECURITY.md). The draft high-salience quota in PR #160 is **not** available on `main` and is intentionally omitted from this configuration table.
+
 ## How the memory state works
 
 1. A deterministic Gaussian matrix maps an embedding into a **10,000-element** array of ±1 values ([projection implementation](crates/null-drift-core/src/spl.rs)).

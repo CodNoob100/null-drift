@@ -127,6 +127,32 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await storage.client.aclose()
 
+    async def test_embedding_failure_is_not_silent(self):
+        def broken_embedding(_payload):
+            raise RuntimeError("embedding failed")
+
+        storage = NullDriftLangGraphStore(embedding_function=broken_embedding)
+        try:
+            storage.client.post = AsyncMock()
+            with self.assertRaisesRegex(RuntimeError, "embedding failed"):
+                await storage.aput(("team",), "key-1", {"value": 1})
+            storage.client.post.assert_not_awaited()
+        finally:
+            await storage.client.aclose()
+
+    async def test_snapshot_and_restore_use_same_namespace_thread(self):
+        storage = NullDriftLangGraphStore()
+        try:
+            storage.client.post = AsyncMock(return_value=Mock())
+            await storage.take_snapshot(("team", "agent"))
+            first = storage.client.post.call_args.kwargs["params"]
+            await storage.restore_from_snapshot(("team", "agent"))
+            second = storage.client.post.call_args.kwargs["params"]
+            self.assertEqual(first, second)
+            self.assertEqual(first, {"thread_id": encode_namespace(("team", "agent"))})
+        finally:
+            await storage.client.aclose()
+
     async def test_get_ignores_mismatched_key(self):
         storage = NullDriftLangGraphStore()
         try:

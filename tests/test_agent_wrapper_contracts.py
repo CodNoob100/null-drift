@@ -190,6 +190,26 @@ class LangGraphWrapperTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await storage.client.aclose()
 
+    async def test_get_ignores_non_dictionary_value(self):
+        storage = NullDriftLangGraphStore()
+        try:
+            storage.client.get = AsyncMock(
+                return_value=Mock(
+                    json=lambda: {
+                        "recovered_text": '{"key": "key-1", "value": ["wrong"]}'
+                    }
+                )
+            )
+            self.assertIsNone(await storage.aget(("team",), "key-1"))
+        finally:
+            await storage.client.aclose()
+
+    async def test_namespace_encoding_is_order_sensitive(self):
+        self.assertNotEqual(
+            encode_namespace(("team", "agent"), "key"),
+            encode_namespace(("agent", "team"), "key"),
+        )
+
     async def test_get_ignores_mismatched_key(self):
         storage = NullDriftLangGraphStore()
         try:

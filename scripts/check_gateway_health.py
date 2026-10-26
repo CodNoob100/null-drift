@@ -24,6 +24,8 @@ def main():
     args = parser.parse_args()
     if args.wait_seconds < 0:
         parser.error("--wait-seconds must be nonnegative")
+    if not args.url.startswith(("http://127.0.0.1:", "http://localhost:", "http://[::1]:")):
+        parser.error("Only local loopback gateway URLs are supported")
     deadline = time.monotonic() + args.wait_seconds
     while True:
         try:

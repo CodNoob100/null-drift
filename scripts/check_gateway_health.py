@@ -28,7 +28,9 @@ def validate_local_url(base_url):
         or parsed.query
         or parsed.fragment
     ):
-        raise ValueError("Only loopback HTTP gateway URLs with an explicit port are supported")
+        raise ValueError(
+            "Only loopback HTTP gateway URLs with an explicit port are supported"
+        )
     return base_url
 
 

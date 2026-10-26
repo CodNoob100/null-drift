@@ -41,6 +41,8 @@ This timeout is illustrative; first-time model downloads can take longer. A fail
 docker compose -f docker/docker-compose.yml logs --tail=100 gateway nulld
 ```
 
+Check the gateway's response with the example requests below. A successful HTTP response verifies reachability and basic API wiring, but does not establish exact recall or checkpoint durability.
+
 Try an inject and recall:
 
 ```sh

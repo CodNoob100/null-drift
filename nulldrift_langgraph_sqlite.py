@@ -30,7 +30,9 @@ def _namespace_matches(namespace, condition):
         labels = namespace[len(namespace) - len(pattern) :]
     else:
         raise ValueError(f"Unknown namespace match type: {condition.match_type}")
-    return all(wanted == "*" or wanted == actual for wanted, actual in zip(pattern, labels))
+    return all(
+        wanted == "*" or wanted == actual for wanted, actual in zip(pattern, labels)
+    )
 
 
 class NullDriftGatewayStore(BaseStore):

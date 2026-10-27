@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import Mock
 
 try:
-    from langgraph.store.base import BaseStore, GetOp, ListNamespacesOp, PutOp, SearchOp
+    from langgraph.store.base import (\n        BaseStore,\n        GetOp,\n        ListNamespacesOp,\n        MatchCondition,\n        PutOp,\n        SearchOp,\n    )
     from nulldrift_langgraph_sqlite import NullDriftGatewayStore
 except ImportError:
     BaseStore = None
@@ -67,6 +67,48 @@ class RealLangGraphGatewayTests(unittest.TestCase):
         self.assertEqual(
             client.post.call_args.kwargs["json"]["operation"], "namespaces"
         )
+
+    def test_namespace_prefix_suffix_wildcards_depth_and_pagination(self):
+        client = Mock()
+        client.post.return_value.json.return_value = {
+            "namespaces": [
+                ["tenant", "alpha", "draft"],
+                ["tenant", "beta", "draft"],
+                ["tenant", "beta", "published"],
+                ["other", "beta", "draft"],
+                ["tenant", "alpha", "draft", "deep"],
+            ]
+        }
+        store = NullDriftGatewayStore(client=client)
+        result = store.list_namespaces(
+            prefix=("tenant", "*"),
+            suffix=("draft",),
+            limit=10,
+        )
+        self.assertEqual(
+            result, [("tenant", "alpha", "draft"), ("tenant", "beta", "draft")]
+        )
+        result = store.list_namespaces(prefix=("tenant",), max_depth=2, limit=1, offset=1)
+        self.assertEqual(result, [("tenant", "beta")])
+        self.assertEqual(
+            client.post.call_args.kwargs["json"]["operation"], "namespaces"
+        )
+
+    def test_namespace_invalid_pagination_fails_closed(self):
+        store = NullDriftGatewayStore(client=Mock())
+        with self.assertRaises(ValueError):
+            store.batch([ListNamespacesOp(offset=-1)])
+        with self.assertRaises(ValueError):
+            store.batch(
+                [
+                    ListNamespacesOp(
+                        match_conditions=(
+                            MatchCondition(match_type="prefix", path=("tenant",)),
+                        ),
+                        max_depth=-1,
+                    )
+                ]
+            )
 
     def test_unsupported_operations_are_not_silent(self):
         store = NullDriftGatewayStore(client=Mock())

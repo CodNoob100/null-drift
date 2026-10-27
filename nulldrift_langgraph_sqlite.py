@@ -124,9 +124,7 @@ class NullDriftGatewayStore(BaseStore):
                     )
                 ]
                 if op.max_depth is not None:
-                    namespaces = [
-                        namespace[: op.max_depth] for namespace in namespaces
-                    ]
+                    namespaces = [namespace[: op.max_depth] for namespace in namespaces]
                 namespaces = sorted(set(namespaces))
                 results.append(namespaces[op.offset : op.offset + op.limit])
             else:

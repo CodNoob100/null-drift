@@ -8,6 +8,18 @@ GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:8000")
 THREAD_ID = "benchmark_thread"
 
 
+def summarize_latency(samples):
+    """Return the mean, minimum, and maximum latency."""
+    if not samples:
+        raise ValueError("Latency samples cannot be empty")
+
+    return (
+        statistics.mean(samples),
+        min(samples),
+        max(samples),
+    )
+
+
 def run_benchmark(num_requests=100):
     print(f"Waiting for Gateway at {GATEWAY_URL}...")
     for _ in range(30):
@@ -59,11 +71,11 @@ def run_benchmark(num_requests=100):
 
     print("\n=== PERFORMANCE METRICS ===")
     print(f"Total Requests: {num_requests} injects, 10 recalls")
-    print(
-        f"Average Inject Latency (End-to-End): {statistics.mean(inject_times):.2f} ms"
-    )
-    print(f"Fastest Inject: {min(inject_times):.2f} ms")
-    print(f"Slowest Inject: {max(inject_times):.2f} ms")
+    avg_inject, fastest_inject, slowest_inject = summarize_latency(inject_times)
+
+    print(f"Average Inject Latency (End-to-End): {avg_inject:.2f} ms")
+    print(f"Fastest Inject: {fastest_inject:.2f} ms")
+    print(f"Slowest Inject: {slowest_inject:.2f} ms")
     print(f"Average Recall Latency: {statistics.mean(recall_times):.2f} ms")
     print(f"Disk Snapshot Latency: {snapshot_time:.2f} ms")
 

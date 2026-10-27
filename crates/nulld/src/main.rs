@@ -736,7 +736,11 @@ mod tests {
     async fn failed_framework_snapshot_preserves_existing_memory() {
         let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
         let path = std::env::temp_dir()
-            .join(format!("nulld_missing_memory_dir_{}_{}", std::process::id(), id))
+            .join(format!(
+                "nulld_missing_memory_dir_{}_{}",
+                std::process::id(),
+                id
+            ))
             .join("framework_memory.nd");
         assert!(!path.parent().unwrap().exists());
 

@@ -6,7 +6,14 @@ import unittest
 from unittest.mock import Mock
 
 try:
-    from langgraph.store.base import (\n        BaseStore,\n        GetOp,\n        ListNamespacesOp,\n        MatchCondition,\n        PutOp,\n        SearchOp,\n    )
+    from langgraph.store.base import (
+        BaseStore,
+        GetOp,
+        ListNamespacesOp,
+        MatchCondition,
+        PutOp,
+        SearchOp,
+    )
     from nulldrift_langgraph_sqlite import NullDriftGatewayStore
 except ImportError:
     BaseStore = None
@@ -88,7 +95,9 @@ class RealLangGraphGatewayTests(unittest.TestCase):
         self.assertEqual(
             result, [("tenant", "alpha", "draft"), ("tenant", "beta", "draft")]
         )
-        result = store.list_namespaces(prefix=("tenant",), max_depth=2, limit=1, offset=1)
+        result = store.list_namespaces(
+            prefix=("tenant",), max_depth=2, limit=1, offset=1
+        )
         self.assertEqual(result, [("tenant", "beta")])
         self.assertEqual(
             client.post.call_args.kwargs["json"]["operation"], "namespaces"

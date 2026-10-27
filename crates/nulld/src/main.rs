@@ -550,6 +550,7 @@ mod tests {
         GlobalState, SharedState, ThreadState, cleanup_current_state, get_or_load_thread,
         load_thread_from_path, persist_snapshot, projector_budget_allows, validate_thread_id,
     };
+    use axum::response::IntoResponse;
     use moka::future::Cache;
     use ndarray::Array1;
     use null_drift_core::amn::AttractorIndex;
@@ -557,7 +558,6 @@ mod tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
     use std::sync::Arc;
-    use axum::response::IntoResponse;
     use tokio::sync::{Barrier, RwLock};
 
     #[tokio::test]
@@ -731,7 +731,6 @@ mod tests {
         assert!(persist_snapshot(&path, b"invalid").await.is_err());
         assert!(!path.exists());
     }
-
 
     #[tokio::test]
     async fn failed_framework_snapshot_preserves_existing_memory() {

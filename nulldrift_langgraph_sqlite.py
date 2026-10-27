@@ -19,11 +19,25 @@ from langgraph.store.base import (
 )
 
 
-class NullDriftGatewayStore(BaseStore):
-    """Conservative LangGraph BaseStore adapter for keyed gateway threads.
+def _namespace_matches(namespace, condition):
+    """Match one LangGraph prefix/suffix condition, including '*' labels."""
+    pattern = condition.path
+    if len(pattern) > len(namespace):
+        return False
+    if condition.match_type == "prefix":
+        labels = namespace[: len(pattern)]
+    elif condition.match_type == "suffix":
+        labels = namespace[len(namespace) - len(pattern) :]
+    else:
+        raise ValueError(f"Unknown namespace match type: {condition.match_type}")
+    return all(wanted == "*" or wanted == actual for wanted, actual in zip(pattern, labels))
 
-    Each (namespace, key) is mapped to a separate gateway thread.
-    The gateway's dominant-state recall is not a multi-record index.
+
+class NullDriftGatewayStore(BaseStore):
+    """LangGraph BaseStore adapter backed by the daemon's exact-key ledger.
+
+    Namespace/key operations use native postcard-backed records, not the
+    daemon's separate approximate HRSA/AMN recall mechanism.
     """
 
     def __init__(self, gateway_url="http://127.0.0.1:8000", client=None):
@@ -93,15 +107,26 @@ class NullDriftGatewayStore(BaseStore):
                     ]
                 )
             elif isinstance(op, ListNamespacesOp):
-                if op.max_depth is not None or op.match_conditions:
-                    raise NotImplementedError(
-                        "Namespace depth and suffix filtering are not supported"
+                if op.offset < 0 or op.limit < 0:
+                    raise ValueError("Namespace pagination must be nonnegative")
+                if op.max_depth is not None and op.max_depth < 0:
+                    raise ValueError("Namespace max_depth must be nonnegative")
+                conditions = op.match_conditions or ()
+                payload = self._memory("namespaces", ())
+                namespaces = [
+                    tuple(namespace)
+                    for namespace in payload["namespaces"]
+                    if all(
+                        _namespace_matches(namespace, condition)
+                        for condition in conditions
                     )
-                prefix = ()
-                payload = self._memory("namespaces", prefix)
-                results.append(
-                    [tuple(namespace) for namespace in payload["namespaces"]]
-                )
+                ]
+                if op.max_depth is not None:
+                    namespaces = [
+                        namespace[: op.max_depth] for namespace in namespaces
+                    ]
+                namespaces = sorted(set(namespaces))
+                results.append(namespaces[op.offset : op.offset + op.limit])
             else:
                 raise NotImplementedError("Unsupported LangGraph operation")
         return results

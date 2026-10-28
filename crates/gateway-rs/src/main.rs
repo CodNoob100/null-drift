@@ -274,9 +274,7 @@ mod tests {
     #[tokio::test]
     async fn memory_proxy_forwards_exact_payload_and_preserves_daemon_errors() {
         // No embedding model or external service is needed for framework memory.
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let daemon = tokio::spawn(async move {
             axum::serve(

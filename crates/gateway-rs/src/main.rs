@@ -248,3 +248,82 @@ async fn memory_state(
     let body = response.text().await.unwrap_or_default();
     Ok(build_json_response(status, body))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+    use serde_json::json;
+
+    async fn fake_daemon_memory(
+        Json(payload): Json<serde_json::Value>,
+    ) -> (StatusCode, Json<serde_json::Value>) {
+        if payload["operation"] == "put" {
+            assert_eq!(payload["namespace"], json!(["tenant", "agent"]));
+            assert_eq!(payload["key"], "entry");
+            assert_eq!(payload["value"], json!({"text": "durable"}));
+            (StatusCode::CREATED, Json(json!({"revision": 7})))
+        } else {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "unsupported operation"})),
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn memory_proxy_forwards_exact_payload_and_preserves_daemon_errors() {
+        // No embedding model or external service is needed for framework memory.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .unwrap();
+        let address = listener.local_addr().unwrap();
+        let daemon = tokio::spawn(async move {
+            axum::serve(
+                listener,
+                Router::new().route("/memory", post(fake_daemon_memory)),
+            )
+            .await
+            .unwrap();
+        });
+
+        let state = AppState {
+            embedders: Arc::new(Vec::new()),
+            index: Arc::new(AtomicUsize::new(0)),
+            client: Client::new(),
+            nulld_url: format!("http://{address}"),
+        };
+
+        let ok = memory_state(
+            State(state.clone()),
+            Json(json!({
+                "operation": "put",
+                "namespace": ["tenant", "agent"],
+                "key": "entry",
+                "value": {"text": "durable"}
+            })),
+        )
+        .await
+        .unwrap();
+        assert_eq!(ok.status(), StatusCode::CREATED);
+        let body = to_bytes(ok.into_body(), 4096).await.unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            json!({"revision": 7})
+        );
+
+        let rejected = memory_state(
+            State(state),
+            Json(json!({"operation": "invalid", "namespace": ["tenant"]})),
+        )
+        .await
+        .unwrap();
+        assert_eq!(rejected.status(), StatusCode::BAD_REQUEST);
+        let body = to_bytes(rejected.into_body(), 4096).await.unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            json!({"error": "unsupported operation"})
+        );
+        daemon.abort();
+    }
+}

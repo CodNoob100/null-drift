@@ -22,7 +22,7 @@ jobs:
           components: rustfmt
       - name: Compile and test native daemon
         run: cargo test -p nulld --all-targets
-      - name: Compile gateway
-        run: cargo check -p gateway-rs
+      - name: Test gateway proxy and compile gateway
+        run: cargo test -p gateway-rs --all-targets
       - name: Check Rust formatting
         run: cargo fmt --all -- --check

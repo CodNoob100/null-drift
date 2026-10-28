@@ -3,6 +3,7 @@
 //! The ledger can be serialized into the daemon's existing postcard snapshots.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 const MAX_RECORDS: usize = 4096;
 const MAX_VALUE_BYTES: usize = 64 * 1024;
@@ -29,6 +30,32 @@ pub enum LedgerError {
 }
 
 impl IdentityLedger {
+    /// Reject structurally valid postcard snapshots that violate ledger invariants.
+    /// A corrupt or tampered checkpoint must not bypass live write limits.
+    pub fn validate_loaded(&self) -> Result<(), LedgerError> {
+        if self.records.len() > MAX_RECORDS {
+            return Err(LedgerError::CapacityExceeded);
+        }
+        let mut seen = HashSet::new();
+        for record in &self.records {
+            Self::validate(&record.namespace, &record.key)?;
+            if record.revision == 0
+                || record.revision > self.revision
+                || !seen.insert((&record.namespace, &record.key))
+            {
+                return Err(LedgerError::InvalidIdentity);
+            }
+            if record.value.len() > MAX_VALUE_BYTES
+                || !serde_json::from_str::<serde_json::Value>(&record.value)
+                    .map_err(|_| LedgerError::InvalidValue)?
+                    .is_object()
+            {
+                return Err(LedgerError::InvalidValue);
+            }
+        }
+        Ok(())
+    }
+
     fn validate(namespace: &[String], key: &str) -> Result<(), LedgerError> {
         if namespace.is_empty()
             || namespace.len() > 32
@@ -222,6 +249,37 @@ mod tests {
         assert_eq!(ledger.search(&a, 1, 1)[0].key, "z");
         assert_eq!(ledger.search(&a, 2, 1).len(), 0);
         assert_eq!(ledger.namespaces(&a), vec![a]);
+    }
+
+    #[test]
+    fn loaded_snapshots_reject_duplicate_keys_and_invalid_values() {
+        let namespace = vec!["tenant".to_string()];
+        let valid = MemoryRecord {
+            namespace: namespace.clone(),
+            key: "key".to_string(),
+            value: "{}".to_string(),
+            revision: 1,
+        };
+        let mut ledger = IdentityLedger {
+            revision: 1,
+            records: vec![valid.clone(), valid.clone()],
+        };
+        assert_eq!(ledger.validate_loaded(), Err(LedgerError::InvalidIdentity));
+
+        ledger.records = vec![MemoryRecord {
+            value: "not-json".to_string(),
+            ..valid.clone()
+        }];
+        assert_eq!(ledger.validate_loaded(), Err(LedgerError::InvalidValue));
+
+        ledger.records = vec![MemoryRecord {
+            revision: 2,
+            ..valid.clone()
+        }];
+        assert_eq!(ledger.validate_loaded(), Err(LedgerError::InvalidIdentity));
+
+        ledger.records = vec![valid];
+        assert_eq!(ledger.validate_loaded(), Ok(()));
     }
 
     #[test]

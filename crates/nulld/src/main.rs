@@ -192,12 +192,21 @@ const FRAMEWORK_MEMORY_SNAPSHOT: &str = "framework_memory.nd";
 
 async fn load_identity_ledger(path: &Path) -> std::io::Result<IdentityLedger> {
     match fs::read(path).await {
-        Ok(bytes) => postcard::from_bytes(&bytes).map_err(|error| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Cannot decode framework memory snapshot: {error}"),
-            )
-        }),
+        Ok(bytes) => {
+            let ledger: IdentityLedger = postcard::from_bytes(&bytes).map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Cannot decode framework memory snapshot: {error}"),
+                )
+            })?;
+            ledger.validate_loaded().map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Invalid framework memory snapshot: {error:?}"),
+                )
+            })?;
+            Ok(ledger)
+        }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(IdentityLedger::default()),
         Err(error) => Err(error),
     }
@@ -836,6 +845,69 @@ mod tests {
         assert_eq!(response.status(), super::StatusCode::OK);
         let restored = super::load_identity_ledger(&path).await.unwrap();
         assert!(restored.get(&namespace, "key").is_none());
+        tokio::fs::remove_file(path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn concurrent_framework_writes_survive_reload_without_cross_tenant_loss() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "nulld_concurrent_framework_{}_{}.nd",
+            std::process::id(),
+            id
+        ));
+        let state: SharedState = Arc::new(GlobalState {
+            projectors: RwLock::new(HashMap::new()),
+            threads: Cache::new(64),
+            cleanup_threshold: 3000,
+            identity: RwLock::new(crate::IdentityLedger::default()),
+            framework_snapshot: path.clone(),
+        });
+        let count = 12;
+        let barrier = Arc::new(Barrier::new(count + 1));
+        let mut requests = Vec::new();
+
+        for i in 0..count {
+            let state = Arc::clone(&state);
+            let barrier = Arc::clone(&barrier);
+            requests.push(tokio::spawn(async move {
+                barrier.wait().await;
+                let namespace = vec![format!("tenant-{}", i % 2)];
+                let response = super::handle_memory(
+                    axum::extract::State(state),
+                    axum::Json(super::MemoryRequest {
+                        operation: "put".to_string(),
+                        namespace,
+                        key: format!("key-{i}"),
+                        value: Some(serde_json::json!({"index": i})),
+                        offset: 0,
+                        limit: 10,
+                    }),
+                )
+                .await
+                .into_response();
+                assert_eq!(response.status(), super::StatusCode::OK);
+            }));
+        }
+        barrier.wait().await;
+        for request in requests {
+            request.await.unwrap();
+        }
+
+        let recovered = super::load_identity_ledger(&path).await.unwrap();
+        for i in 0..count {
+            let namespace = vec![format!("tenant-{}", i % 2)];
+            let other = vec![format!("tenant-{}", (i + 1) % 2)];
+            let key = format!("key-{i}");
+            let record = recovered.get(&namespace, &key).unwrap();
+            assert_eq!(
+                serde_json::from_str::<serde_json::Value>(&record.value).unwrap()["index"],
+                i
+            );
+            assert!(recovered.get(&other, &key).is_none());
+        }
+        assert_eq!(recovered.search(&["tenant-0".to_string()], 0, 100).len(), 6);
+        assert_eq!(recovered.search(&["tenant-1".to_string()], 0, 100).len(), 6);
         tokio::fs::remove_file(path).await.unwrap();
     }
 

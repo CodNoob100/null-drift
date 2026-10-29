@@ -1,0 +1,4 @@
+[flake8]
+# Black formats slices with spaces around colons (E203); keep both linters compatible.
+extend-ignore = E203
+max-line-length = 120

@@ -1,0 +1,26 @@
+name: Real LangGraph Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "nulldrift_langgraph_sqlite.py"
+      - "tests/test_langgraph_sqlite_contract.py"
+      - ".github/workflows/langgraph-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  langgraph-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actual LangGraph store package
+        run: python -m pip install "langgraph-checkpoint>=3,<5" black
+      - name: Exercise actual LangGraph BaseStore
+        run: python -m unittest discover -s tests -p test_langgraph_sqlite_contract.py -v
+      - name: Check Black formatting
+        run: black --diff --check nulldrift_langgraph_sqlite.py tests/test_langgraph_sqlite_contract.py

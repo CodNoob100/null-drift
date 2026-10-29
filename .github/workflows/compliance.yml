@@ -90,8 +90,9 @@ jobs:
         run: |
           pip install black
           if ! black --check . > black_out.txt 2>&1; then
-            echo "::error::CI check failed. See the diagnostic output below and fix this pull request before merging."
+            echo "::error::Python formatting failed. Showing the exact Black patch for correction."
             cat black_out.txt
+            black --diff . || true
             exit 1
           fi
 

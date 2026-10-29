@@ -1,3 +1,5 @@
+mod identity_ledger;
+
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Query, State},
@@ -6,6 +8,7 @@ use axum::{
     routing::{get, post},
 };
 
+use identity_ledger::IdentityLedger;
 use moka::future::Cache;
 use ndarray::Array1;
 use null_drift_core::amn::AttractorIndex;
@@ -13,7 +16,7 @@ use null_drift_core::hrsa::Hrsa;
 use null_drift_core::spl::Projector;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -111,6 +114,8 @@ struct GlobalState {
     projectors: RwLock<HashMap<usize, Arc<Projector>>>,
     threads: Cache<String, Arc<RwLock<ThreadState>>>,
     cleanup_threshold: usize,
+    identity: RwLock<IdentityLedger>,
+    framework_snapshot: PathBuf,
 }
 
 type SharedState = Arc<GlobalState>;
@@ -170,6 +175,115 @@ struct SimpleResponse {
     status: String,
 }
 
+#[derive(Deserialize)]
+struct MemoryRequest {
+    operation: String,
+    namespace: Vec<String>,
+    #[serde(default)]
+    key: String,
+    value: Option<serde_json::Value>,
+    #[serde(default)]
+    offset: usize,
+    #[serde(default = "default_memory_limit")]
+    limit: usize,
+}
+
+const FRAMEWORK_MEMORY_SNAPSHOT: &str = "framework_memory.nd";
+
+async fn load_identity_ledger(path: &Path) -> std::io::Result<IdentityLedger> {
+    match fs::read(path).await {
+        Ok(bytes) => {
+            let ledger: IdentityLedger = postcard::from_bytes(&bytes).map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Cannot decode framework memory snapshot: {error}"),
+                )
+            })?;
+            ledger.validate_loaded().map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Invalid framework memory snapshot: {error:?}"),
+                )
+            })?;
+            Ok(ledger)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(IdentityLedger::default()),
+        Err(error) => Err(error),
+    }
+}
+
+fn default_memory_limit() -> usize {
+    100
+}
+
+async fn handle_memory(
+    State(state): State<SharedState>,
+    Json(request): Json<MemoryRequest>,
+) -> impl IntoResponse {
+    let mut ledger = state.identity.write().await;
+    let is_mutation = request.operation == "put" || request.operation == "delete";
+    let mut staged = ledger.clone();
+    let result = match request.operation.as_str() {
+        "put" => match request.value {
+            Some(value) => staged
+                .put(&request.namespace, &request.key, value)
+                .map(|revision| serde_json::json!({"revision": revision})),
+            None => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({"error": "value required"})),
+                );
+            }
+        },
+        "get" => Ok(serde_json::json!({"record": ledger.get(&request.namespace, &request.key)})),
+        "delete" => staged
+            .delete(&request.namespace, &request.key)
+            .map(|deleted| serde_json::json!({"deleted": deleted})),
+        "search" => Ok(
+            serde_json::json!({"records": ledger.search(&request.namespace, request.offset, request.limit)}),
+        ),
+        "namespaces" => {
+            Ok(serde_json::json!({"namespaces": ledger.namespaces(&request.namespace)}))
+        }
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "unknown operation"})),
+            );
+        }
+    };
+    match result {
+        Ok(value) => {
+            if is_mutation {
+                let bytes = match postcard::to_stdvec(&staged) {
+                    Ok(bytes) => bytes,
+                    Err(_) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(serde_json::json!({"error": "memory serialization failed"})),
+                        );
+                    }
+                };
+                if persist_snapshot(&state.framework_snapshot, &bytes)
+                    .await
+                    .is_err()
+                {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({"error": "memory snapshot failed"})),
+                    );
+                }
+                *ledger = staged;
+            }
+            (StatusCode::OK, Json(value))
+        }
+        Err(error) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": format!("{error:?}")})),
+        ),
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting null-drift HRSA multi-tenant daemon...");
@@ -214,6 +328,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         projectors: RwLock::new(projectors),
         threads: cache,
         cleanup_threshold,
+        identity: RwLock::new(load_identity_ledger(Path::new(FRAMEWORK_MEMORY_SNAPSHOT)).await?),
+        framework_snapshot: PathBuf::from(FRAMEWORK_MEMORY_SNAPSHOT),
     };
 
     let state = Arc::new(global_state);
@@ -224,6 +340,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/recall", get(handle_recall))
         .route("/snapshot", post(handle_snapshot))
         .route("/restore", post(handle_restore))
+        .route("/memory", post(handle_memory))
         .layer(DefaultBodyLimit::max(64 * 1024))
         .with_state(state);
 
@@ -442,11 +559,13 @@ mod tests {
         GlobalState, SharedState, ThreadState, cleanup_current_state, get_or_load_thread,
         load_thread_from_path, persist_snapshot, projector_budget_allows, validate_thread_id,
     };
+    use axum::response::IntoResponse;
     use moka::future::Cache;
     use ndarray::Array1;
     use null_drift_core::amn::AttractorIndex;
     use null_drift_core::hrsa::Hrsa;
     use std::collections::HashMap;
+    use std::path::PathBuf;
     use std::sync::Arc;
     use tokio::sync::{Barrier, RwLock};
 
@@ -542,6 +661,8 @@ mod tests {
             projectors: RwLock::new(HashMap::new()),
             threads: Cache::new(64),
             cleanup_threshold: 3000,
+            identity: RwLock::new(crate::IdentityLedger::default()),
+            framework_snapshot: PathBuf::from("unused-framework-memory.nd"),
         });
         let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
         let thread_id = format!("coalesce_{}_{}", std::process::id(), id);
@@ -578,6 +699,8 @@ mod tests {
             projectors: RwLock::new(HashMap::new()),
             threads: Cache::new(64),
             cleanup_threshold: 3000,
+            identity: RwLock::new(crate::IdentityLedger::default()),
+            framework_snapshot: PathBuf::from("unused-framework-memory.nd"),
         });
         let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
         let a = format!("thread_a_{}_{}", std::process::id(), id);
@@ -616,6 +739,196 @@ mod tests {
             .join("state.nd");
         assert!(persist_snapshot(&path, b"invalid").await.is_err());
         assert!(!path.exists());
+    }
+
+    #[tokio::test]
+    async fn failed_framework_snapshot_preserves_existing_memory() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir()
+            .join(format!(
+                "nulld_missing_memory_dir_{}_{}",
+                std::process::id(),
+                id
+            ))
+            .join("framework_memory.nd");
+        assert!(!path.parent().unwrap().exists());
+
+        let namespace = vec!["tenant".to_string()];
+        let mut ledger = crate::IdentityLedger::default();
+        ledger
+            .put(&namespace, "key", serde_json::json!({"v": 1}))
+            .unwrap();
+        let state: SharedState = Arc::new(GlobalState {
+            projectors: RwLock::new(HashMap::new()),
+            threads: Cache::new(64),
+            cleanup_threshold: 3000,
+            identity: RwLock::new(ledger),
+            framework_snapshot: path.clone(),
+        });
+
+        let response = super::handle_memory(
+            axum::extract::State(Arc::clone(&state)),
+            axum::Json(super::MemoryRequest {
+                operation: "put".to_string(),
+                namespace: namespace.clone(),
+                key: "key".to_string(),
+                value: Some(serde_json::json!({"v": 2})),
+                offset: 0,
+                limit: 10,
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), super::StatusCode::INTERNAL_SERVER_ERROR);
+        let guard = state.identity.read().await;
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&guard.get(&namespace, "key").unwrap().value)
+                .unwrap()["v"],
+            1
+        );
+        assert!(!path.exists());
+    }
+
+    #[tokio::test]
+    async fn framework_memory_put_delete_survive_snapshot_reload() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "nulld_framework_memory_{}_{}.nd",
+            std::process::id(),
+            id
+        ));
+        let namespace = vec!["tenant".to_string(), "agent".to_string()];
+        let state: SharedState = Arc::new(GlobalState {
+            projectors: RwLock::new(HashMap::new()),
+            threads: Cache::new(64),
+            cleanup_threshold: 3000,
+            identity: RwLock::new(crate::IdentityLedger::default()),
+            framework_snapshot: path.clone(),
+        });
+
+        let response = super::handle_memory(
+            axum::extract::State(Arc::clone(&state)),
+            axum::Json(super::MemoryRequest {
+                operation: "put".to_string(),
+                namespace: namespace.clone(),
+                key: "key".to_string(),
+                value: Some(serde_json::json!({"v": 7})),
+                offset: 0,
+                limit: 10,
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), super::StatusCode::OK);
+        let restored = super::load_identity_ledger(&path).await.unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(
+                &restored.get(&namespace, "key").unwrap().value
+            )
+            .unwrap()["v"],
+            7
+        );
+
+        let response = super::handle_memory(
+            axum::extract::State(Arc::clone(&state)),
+            axum::Json(super::MemoryRequest {
+                operation: "delete".to_string(),
+                namespace: namespace.clone(),
+                key: "key".to_string(),
+                value: None,
+                offset: 0,
+                limit: 10,
+            }),
+        )
+        .await
+        .into_response();
+        assert_eq!(response.status(), super::StatusCode::OK);
+        let restored = super::load_identity_ledger(&path).await.unwrap();
+        assert!(restored.get(&namespace, "key").is_none());
+        tokio::fs::remove_file(path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn concurrent_framework_writes_survive_reload_without_cross_tenant_loss() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "nulld_concurrent_framework_{}_{}.nd",
+            std::process::id(),
+            id
+        ));
+        let state: SharedState = Arc::new(GlobalState {
+            projectors: RwLock::new(HashMap::new()),
+            threads: Cache::new(64),
+            cleanup_threshold: 3000,
+            identity: RwLock::new(crate::IdentityLedger::default()),
+            framework_snapshot: path.clone(),
+        });
+        let count = 12;
+        let barrier = Arc::new(Barrier::new(count + 1));
+        let mut requests = Vec::new();
+
+        for i in 0..count {
+            let state = Arc::clone(&state);
+            let barrier = Arc::clone(&barrier);
+            requests.push(tokio::spawn(async move {
+                barrier.wait().await;
+                let namespace = vec![format!("tenant-{}", i % 2)];
+                let response = super::handle_memory(
+                    axum::extract::State(state),
+                    axum::Json(super::MemoryRequest {
+                        operation: "put".to_string(),
+                        namespace,
+                        key: format!("key-{i}"),
+                        value: Some(serde_json::json!({"index": i})),
+                        offset: 0,
+                        limit: 10,
+                    }),
+                )
+                .await
+                .into_response();
+                assert_eq!(response.status(), super::StatusCode::OK);
+            }));
+        }
+        barrier.wait().await;
+        for request in requests {
+            request.await.unwrap();
+        }
+
+        let recovered = super::load_identity_ledger(&path).await.unwrap();
+        for i in 0..count {
+            let namespace = vec![format!("tenant-{}", i % 2)];
+            let other = vec![format!("tenant-{}", (i + 1) % 2)];
+            let key = format!("key-{i}");
+            let record = recovered.get(&namespace, &key).unwrap();
+            assert_eq!(
+                serde_json::from_str::<serde_json::Value>(&record.value).unwrap()["index"],
+                i
+            );
+            assert!(recovered.get(&other, &key).is_none());
+        }
+        assert_eq!(recovered.search(&["tenant-0".to_string()], 0, 100).len(), 6);
+        assert_eq!(recovered.search(&["tenant-1".to_string()], 0, 100).len(), 6);
+        tokio::fs::remove_file(path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn corrupt_framework_memory_snapshot_fails_closed() {
+        let id = super::NEXT_SNAPSHOT_ID.fetch_add(1, super::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "nulld_corrupt_framework_memory_{}_{}.nd",
+            std::process::id(),
+            id
+        ));
+        tokio::fs::write(&path, b"invalid postcard bytes")
+            .await
+            .unwrap();
+        let error = super::load_identity_ledger(&path).await.unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        assert_eq!(
+            tokio::fs::read(&path).await.unwrap(),
+            b"invalid postcard bytes"
+        );
+        tokio::fs::remove_file(path).await.unwrap();
     }
 
     #[test]

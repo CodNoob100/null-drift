@@ -1,7 +1,25 @@
+import hashlib
 import httpx
 import json
 import logging
 from typing import Any, Callable, Dict, List, Optional
+
+
+def encode_namespace(namespace: tuple[str, ...], key: Optional[str] = None) -> str:
+    """Encode tuple boundaries unambiguously for gateway thread isolation."""
+    if (
+        not isinstance(namespace, tuple)
+        or not namespace
+        or any(not isinstance(part, str) or not part for part in namespace)
+    ):
+        raise ValueError("namespace must contain nonempty strings")
+    if key is not None and (not isinstance(key, str) or not key):
+        raise ValueError("key must be a nonempty string")
+    identity = {"namespace": namespace, "key": key}
+    payload = json.dumps(identity, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
+    return "lg_" + hashlib.sha256(payload).hexdigest()
 
 
 # Protocol Stubs (Assuming CrewAI and LangGraph are installed in the user's environment)
@@ -109,27 +127,26 @@ class NullDriftLangGraphStore(BaseStore):
         Maps LangGraph's namespace to a specific null-drift thread_id, giving every
         namespace its own isolated 10,000D phase space.
         """
-        thread_id = "_".join(namespace)
+        if not isinstance(value, dict):
+            raise TypeError("value must be a dictionary")
+        thread_id = encode_namespace(namespace, key)
         text_payload = json.dumps({"key": key, "value": value})
         data = {"text": text_payload, "salience": 1.0}
 
         if self.embedding_function:
-            try:
-                data["embedding"] = self.embedding_function(text_payload)
-            except Exception as e:
-                logging.error(f"Failed to generate embedding locally: {e}")
-                return
+            data["embedding"] = self.embedding_function(text_payload)
 
         try:
             res = await self.client.post(
                 f"{self.gateway_url}/inject", params={"thread_id": thread_id}, json=data
             )
             res.raise_for_status()
-        except httpx.RequestError as e:
-            logging.error(f"NullDrift LangGraph async put failed: {e}")
+        except httpx.RequestError:
+            logging.exception("NullDrift LangGraph async put failed")
+            raise
 
     async def aget(self, namespace: tuple[str, ...], key: str) -> Optional[dict]:
-        thread_id = "_".join(namespace)
+        thread_id = encode_namespace(namespace, key)
         try:
             res = await self.client.get(
                 f"{self.gateway_url}/recall", params={"thread_id": thread_id}
@@ -138,28 +155,38 @@ class NullDriftLangGraphStore(BaseStore):
             data = res.json()
             if data.get("recovered_text"):
                 parsed = json.loads(data["recovered_text"])
-                if parsed.get("key") == key:
-                    return parsed.get("value")
-        except httpx.RequestError as e:
-            logging.error(f"NullDrift LangGraph async get failed: {e}")
+                if isinstance(parsed, dict) and parsed.get("key") == key:
+                    value = parsed.get("value")
+                    return value if isinstance(value, dict) else None
+        except httpx.RequestError:
+            logging.exception("NullDrift LangGraph async get failed")
+            raise
         return None
 
-    async def take_snapshot(self, namespace: tuple[str, ...]) -> None:
-        thread_id = "_".join(namespace)
+    async def take_snapshot(
+        self, namespace: tuple[str, ...], key: Optional[str] = None
+    ) -> None:
+        """Snapshot one keyed thread when key is supplied."""
+        thread_id = encode_namespace(namespace, key)
         try:
             res = await self.client.post(
                 f"{self.gateway_url}/snapshot", params={"thread_id": thread_id}
             )
             res.raise_for_status()
-        except httpx.RequestError as e:
-            logging.error(f"NullDrift LangGraph async snapshot failed: {e}")
+        except httpx.RequestError:
+            logging.exception("NullDrift LangGraph async snapshot failed")
+            raise
 
-    async def restore_from_snapshot(self, namespace: tuple[str, ...]) -> None:
-        thread_id = "_".join(namespace)
+    async def restore_from_snapshot(
+        self, namespace: tuple[str, ...], key: Optional[str] = None
+    ) -> None:
+        """Restore one keyed thread when key is supplied."""
+        thread_id = encode_namespace(namespace, key)
         try:
             res = await self.client.post(
                 f"{self.gateway_url}/restore", params={"thread_id": thread_id}
             )
             res.raise_for_status()
-        except httpx.RequestError as e:
-            logging.error(f"NullDrift LangGraph async restore failed: {e}")
+        except httpx.RequestError:
+            logging.exception("NullDrift LangGraph async restore failed")
+            raise

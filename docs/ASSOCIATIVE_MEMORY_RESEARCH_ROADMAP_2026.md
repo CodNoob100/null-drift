@@ -39,11 +39,18 @@ Use Rust-native bounded associative structures and postcard .nd snapshots. Do no
 - Report improvements and regressions with measured values, not claimed paper results.
 - Keep advanced retrieval feature-flagged until accuracy, provenance, memory and latency gates pass.
 
-## Status at creation
-Research synthesis: complete as a design review, not as implementation.
-Existing native exact ledger: implemented but Rust workflow currently failing.
-HeLa-Mem graph, RippleMem multi-cue, Synapse inhibition, AnchorMem provenance, autonomous rehearsal: proposed experiments, **not yet implemented**.
-Do not mark these tracks complete until code, tests and benchmark evidence exist.
+## Verified status (2026-10-29 maintenance review)
+Research synthesis remains design work, not paper replication.
+Draft PR #188 at `e1b9ec1` passed four exact-head workflows on
+2026-10-28: native Rust (23 daemon tests and one gateway proxy test),
+seven real-package LangGraph contract tests using mocked HTTP,
+compliance and advisory security scanning. The native ledger is wired
+to daemon/gateway with staged postcard writes and reload/rollback tests.
+Real end-to-end process restart, directory-sync/power-loss durability,
+authentication and measured benchmark ablations remain open.
+HeLa-Mem graph, RippleMem multi-cue, Synapse inhibition, AnchorMem
+provenance and autonomous rehearsal are proposed, **not implemented**.
+Do not promote them without code, tests and ablation evidence.
 
 ## References
 - https://www.sciencedirect.com/science/article/pii/S0896627325001722

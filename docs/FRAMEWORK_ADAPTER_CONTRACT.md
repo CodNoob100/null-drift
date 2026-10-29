@@ -20,10 +20,13 @@ used for `aput` to target that specific thread. Omitting the key targets the
 namespace-only thread, **not** all keys in that namespace. Cross-restart
 persistence remains unverified.
 
-The gateway's dominant-state recall is not a durable multi-key index. An
-upstream-compatible adapter must use a separate authoritative keyed backend
-(or a new, explicitly supported gateway API) and retain namespace isolation.
-Do not silently claim that recall preserves every previously written key.
+The legacy gateway's dominant-state `/recall` is not a durable multi-key
+index. Draft PR #188 adds a separate bounded native `IdentityLedger`,
+a daemon `/memory` endpoint and a gateway `/memory` proxy. The optional
+`NullDriftGatewayStore` in `nulldrift_langgraph_sqlite.py` (legacy filename,
+no SQL dependency) implements real LangGraph `BaseStore` `batch`/`abatch`
+operations against the exact-key API. Approximate recall must never
+substitute for exact namespace/key lookup.
 
 Required acceptance tests, with the real installed LangGraph dependency:
 
@@ -73,11 +76,25 @@ until the contract tests are green.
 
 ## Database-free implementation status
 
-The gateway-only `NullDriftGatewayStore` uses null-drift's existing
-`/inject` and `/recall` APIs, without SQLite or another database.
-It implements a limited `BaseStore` operation subset. Native keyed
-deletion, complete namespace enumeration, and crash-durable exact records
-remain unimplemented. Unsupported operations must fail explicitly.
+**Draft PR #188 implementation (not merged/released):** the daemon has a
+bounded native `IdentityLedger` with exact put/get/delete, prefix search,
+namespace enumeration and postcard `framework_memory.nd` persistence.
+The gateway forwards `/memory` requests and daemon HTTP errors.
+`NullDriftGatewayStore` uses this endpoint, not `/inject`/`/recall`,
+and passed seven tests with the installed real LangGraph `BaseStore`
+package and a mocked HTTP boundary. The Rust daemon passed 23 tests
+(including staged-write rollback, snapshot reload and concurrent tenant
+writes); a gateway proxy test also passed at head `e1b9ec1` in
+2026-10-28 GitHub Actions.
+
+**Still unverified:** real daemon + gateway + LangGraph end-to-end
+process/restart integration, OS/power-loss durability, authentication,
+and official CrewAI `StorageBackend` compatibility. Semantic search,
+filters and TTL remain unsupported and fail explicitly. `Item` timestamps
+are synthesized at read time, not persisted provenance. The snapshot
+writer does not sync the parent directory after rename. The separate
+`nulldrift_agents.py` wrappers remain convenience APIs. No SQL or
+external database is introduced.
 
 See `docs/DB_FREE_FRAMEWORK_MEMORY_RESEARCH.md` for the literature-backed
 native AMN/HRSA design and acceptance criteria.

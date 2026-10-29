@@ -32,22 +32,24 @@ approximate attractor is a lossless dictionary.
 2. **Associative channel.** Inject value-derived hypervectors into the
    existing AMN/HRSA memory. Use cues and activation for *discovery*,
    relevance ranking, and pattern completion, never as an exact-key oracle.
-3. **Native lifecycle ledger.** Extend the existing versioned postcard
-   thread snapshot with a bounded collection of identity records, including
-   version, timestamps, tombstone flag, and a stable reference to memory
-   content. This is a native memory metadata structure, not SQL or a
-   separate database. It must have explicit capacity, eviction, and
-   durability guarantees. Avoid a hidden infinite hashmap that recreates
-   a database by another name.
-4. **Deletion.** Tombstone identity first and make recall respect it;
-   separately handle AMN removal/compaction. A tombstone does not guarantee
-   physical erasure of earlier snapshots; secure deletion needs a policy.
-5. **Enumeration.** Namespace search/listing must traverse the native
-   identity ledger, not guess keys from dominant-state recall.
-6. **Durability.** Snapshot atomicity is already implemented using a
-   temporary file, sync, and rename. Add versioned migrations, recovery
-   tests, and explicit write acknowledgment semantics. Current inject
-   acknowledges before a snapshot: it is not crash-durable.
+3. **Native lifecycle ledger.** Draft PR #188 implements a separate
+   `IdentityLedger` of up to 4,096 namespace/key JSON-object records
+   (64 KiB each), revision counters, and postcard `framework_memory.nd`.
+   Timestamps, tombstones, provenance references and global process/disk
+   budgets remain open. This is a bounded native structure, not SQL or
+   an external database.
+4. **Deletion.** Draft PR #188 removes exact ledger records and persists
+   the snapshot before acknowledging deletion. Tombstones, secure erasure
+   of old snapshots and AMN removal/compaction remain open design work.
+5. **Enumeration.** Draft PR #188 implements deterministic namespace
+   prefix search and listing from the native ledger, not dominant-state
+   recall; LangGraph tests cover filtering and pagination.
+6. **Durability.** Draft #188's exact-key `/memory` mutations stage
+   changes, sync a temporary postcard file, rename it and only then
+   publish the new in-memory ledger. Snapshot reload and failed-write
+   rollback have Rust tests. Parent-directory sync, power-loss guarantees,
+   actual process restart and versioned migrations remain open. The
+   separate approximate `/inject` path does not inherit these guarantees.
 7. **Framework boundary.** LangGraph `batch`/`abatch` translate to
    native keyed endpoints. No silent success for unsupported operations.
    CrewAI's actual installed storage interface must be checked separately.
@@ -65,8 +67,13 @@ approximate attractor is a lossless dictionary.
 
 ## Status
 
-Research/design only. Native ledger, deletion, namespace APIs, and durability
-tests remain unimplemented; do not count this document as contract completion.
+**Verified at draft #188 head `e1b9ec1` (2026-10-28):** native exact-key
+ledger, deletion, namespace listing/search, staged persistence and
+reload/rollback tests are implemented. CI passed 23 daemon tests, one
+gateway proxy test, seven real-package LangGraph contract tests and
+compliance. This is not evidence of real end-to-end restart, power-loss
+resilience, CrewAI compatibility or graph/rehearsal algorithms. Draft
+#188 remains unmerged.
 
 ## Research adoption audit (26 October 2026)
 
@@ -75,7 +82,7 @@ papers' algorithms have been reproduced.
 
 | Publication | Adoption | Evidence | Missing implementation |
 | --- | --- | --- | --- |
-| Key-value memory in the brain (Neuron, 2025) | **Partial** | Native `IdentityLedger` separates namespace/key identity from AMN/HRSA; gateway thread encoding also separates keys | Wire ledger to daemon and native snapshot; distinguish keys/values in actual neural learning |
+| Key-value memory in the brain (Neuron, 2025) | **Partial architectural analogy** | Draft #188 wires exact `IdentityLedger` to daemon, gateway and postcard snapshot, separate from AMN/HRSA | Measure semantic-collision ablations, provenance and actual neuroscience claims; do not assert paper replication |
 | HeLa-Mem (ACL 2026) | **Conceptual only** | Existing AMN attractors offer associative recall, but no demonstrated HeLa-Mem-style graph | Hebbian edge updates, episodic graph, semantic distillation, spreading activation |
 | RippleMem (arXiv, August 2026) | **Conceptual only** | No hybrid cue indexing or anchor-local expansion in current code | Cue-rich episodes, typed semantic/structural edges, bounded adaptive expansion |
 | Autonomous retrieval (Frontiers in Computational Neuroscience, 2025) | **Not implemented** | Existing HRSA has attractor dynamics, not demonstrated inhibitory replay | Local inhibitory plasticity, autonomous attractor traversal, replay/consolidation evaluation |
